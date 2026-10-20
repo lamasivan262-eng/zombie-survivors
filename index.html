@@ -1,1 +1,4187 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Zombie Survivors</title>
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;700;900&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-dark: #0f172a;
+      --bg-panel: rgba(30, 41, 59, 0.85);
+      --primary: #10b981;
+      --primary-hover: #059669;
+      --danger: #ef4444;
+      --danger-hover: #dc2626;
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      --gold: #fbbf24;
+      --secondary: #3b82f6;
+      --secondary-hover: #2563eb;
+      --shield: #38bdf8;
+    }
 
+    * {
+      box-sizing: border-box;
+      user-select: none;
+    }
+
+    body {
+      margin: 0;
+      padding: 0;
+      background-color: var(--bg-dark);
+      color: var(--text-main);
+      font-family: 'Montserrat', sans-serif;
+      overflow: hidden;
+    }
+
+    canvas {
+      display: block;
+      cursor: crosshair;
+      position: absolute;
+      top: 0;
+      left: 0;
+      z-index: 1;
+    }
+
+    /* --- IN-GAME HUD --- */
+    #hud {
+      position: absolute;
+      top: 20px;
+      left: 20px;
+      z-index: 5;
+      display: none;
+      pointer-events: none;
+      width: calc(100% - 40px);
+    }
+
+    .health-bar-container {
+      width: 300px;
+      height: 30px;
+      background: rgba(0,0,0,0.7);
+      border: 3px solid rgba(255, 255, 255, 0.2);
+      border-radius: 8px;
+      overflow: hidden;
+      position: relative;
+      margin-bottom: 10px;
+      box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+    }
+
+    #health-bar-fill {
+      height: 100%;
+      width: 100%;
+      background: linear-gradient(90deg, #ef4444, #f87171);
+      transition: width 0.1s linear;
+      position: absolute;
+      left: 0; top: 0;
+    }
+
+    #shield-bar-fill {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, rgba(56,189,248,0.8), rgba(125,211,252,0.8));
+      transition: width 0.1s linear;
+      position: absolute;
+      left: 0; top: 0;
+      z-index: 2;
+    }
+
+    .health-bar-container.low-health {
+      animation: hp-pulse 1s infinite alternate;
+      border-color: rgba(239, 68, 68, 0.8);
+    }
+
+    @keyframes hp-pulse {
+      from { box-shadow: 0 0 5px rgba(239, 68, 68, 0.3); }
+      to { box-shadow: 0 0 20px rgba(239, 68, 68, 0.8); }
+    }
+
+    #health-text {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      font-size: 14px;
+      font-weight: 900;
+      letter-spacing: 1px;
+      text-shadow: 1px 1px 2px black;
+      z-index: 3;
+    }
+
+    .hud-stats-row {
+      display: flex;
+      gap: 15px;
+      margin-bottom: 10px;
+    }
+
+    .stat-display {
+      font-size: 18px;
+      font-weight: 900;
+      color: var(--text-main);
+      background: rgba(0,0,0,0.5);
+      padding: 8px 16px;
+      border-radius: 8px;
+      border: 1px solid rgba(255,255,255,0.1);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .stat-display.gold {
+      color: var(--gold);
+      text-shadow: 0 2px 10px rgba(251, 191, 36, 0.4);
+    }
+
+    #reloading-warning {
+      position: absolute;
+      top: 50vh;
+      left: 50vw;
+      transform: translate(-50%, -50%);
+      font-size: 32px;
+      font-weight: 900;
+      color: var(--gold);
+      text-shadow: 0 0 15px rgba(251, 191, 36, 0.8);
+      display: none;
+      letter-spacing: 2px;
+    }
+
+    #pause-btn {
+      position: absolute;
+      top: 0;
+      right: 0;
+      background: rgba(0,0,0,0.6);
+      border: 2px solid rgba(255,255,255,0.2);
+      color: white;
+      padding: 10px 20px;
+      border-radius: 8px;
+      font-family: 'Montserrat', sans-serif;
+      font-weight: 900;
+      font-size: 16px;
+      cursor: pointer;
+      pointer-events: auto;
+      transition: all 0.2s;
+    }
+
+    #pause-btn:hover { background: var(--primary); border-color: var(--primary); }
+
+    /* --- PAUSE OVERLAY --- */
+    #pause-overlay {
+      position: absolute;
+      top: 0; left: 0; width: 100vw; height: 100vh;
+      background: rgba(15, 23, 42, 0.8);
+      backdrop-filter: blur(5px);
+      display: none;
+      flex-direction: column;
+      justify-content: center; 
+      align-items: center;
+      z-index: 50; 
+    }
+
+    .pause-text {
+      font-size: 72px; font-weight: 900; color: var(--gold);
+      letter-spacing: 8px; text-shadow: 0 0 30px rgba(251,191,36,0.5);
+      margin: 0;
+    }
+
+    /* --- INVENTORY HOTBAR --- */
+    .inventory-bar {
+      position: fixed;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      gap: 15px;
+      z-index: 5;
+    }
+
+    .inv-slot {
+      background: rgba(0,0,0,0.6);
+      border: 2px solid rgba(255,255,255,0.2);
+      border-radius: 12px;
+      padding: 12px;
+      color: white;
+      font-weight: 900;
+      font-size: 18px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      min-width: 65px;
+      position: relative;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+    }
+
+    .inv-slot .hotkey {
+      position: absolute;
+      top: -12px;
+      right: -12px;
+      background: var(--primary);
+      color: white;
+      font-size: 12px;
+      font-weight: 900;
+      width: 24px; 
+      height: 24px;
+      border-radius: 50%;
+      border: 2px solid #000;
+      display: flex; 
+      justify-content: center; 
+      align-items: center;
+    }
+
+    /* --- MAIN MENU UI --- */
+    #main-menu {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      display: flex;
+      z-index: 100;
+      background: radial-gradient(circle at center, rgba(15, 23, 42, 0.6) 0%, rgba(15, 23, 42, 1) 100%);
+      backdrop-filter: blur(8px);
+    }
+
+    .menu-sidebar {
+      width: 350px;
+      background: linear-gradient(180deg, rgba(15, 23, 42, 0.95), rgba(2, 6, 23, 0.95));
+      border-right: 1px solid rgba(255,255,255,0.1);
+      display: flex;
+      flex-direction: column;
+      padding: 40px 30px;
+      box-shadow: 10px 0 30px rgba(0,0,0,0.5);
+      overflow-y: auto;
+      z-index: 10;
+    }
+
+    .game-title {
+      font-size: 38px;
+      font-weight: 900;
+      line-height: 1.1;
+      margin: 0 0 40px 0;
+      background: linear-gradient(to right, #10b981, #3b82f6);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      text-transform: uppercase;
+    }
+
+    .menu-stats-box {
+      background: rgba(0,0,0,0.4);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 12px;
+      padding: 20px;
+      margin-bottom: auto;
+    }
+
+    .menu-stats-box h3 {
+      margin: 0 0 10px 0;
+      font-size: 14px;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 2px;
+    }
+
+    .menu-coins {
+      font-size: 36px;
+      font-weight: 900;
+      color: var(--gold);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .btn-group {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      margin-top: 30px;
+    }
+
+    .play-btn {
+      background: var(--primary);
+      color: white;
+      border: none;
+      padding: 16px;
+      font-size: 20px;
+      font-weight: 900;
+      font-family: 'Montserrat', sans-serif;
+      border-radius: 12px;
+      cursor: pointer;
+      text-transform: uppercase;
+      letter-spacing: 2px;
+      transition: all 0.2s;
+      box-shadow: 0 8px 15px rgba(16, 185, 129, 0.3);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .play-btn:hover {
+      background: var(--primary-hover);
+      transform: translateY(-2px);
+      box-shadow: 0 10px 20px rgba(16, 185, 129, 0.5);
+    }
+
+    .save-btn, .reset-btn {
+      background: transparent;
+      padding: 10px;
+      font-size: 14px;
+      font-weight: 700;
+      font-family: inherit;
+      border-radius: 12px;
+      cursor: pointer;
+      text-transform: uppercase;
+      transition: all 0.2s;
+    }
+
+    .save-btn { border: 2px solid var(--secondary); color: var(--secondary); }
+    .save-btn:hover { background: var(--secondary); color: white; }
+    
+    .reset-btn { border: 2px solid var(--danger); color: var(--danger); }
+    .reset-btn:hover { background: var(--danger); color: white; }
+
+    .menu-content {
+      flex: 1;
+      padding: 40px 60px;
+      overflow-y: auto;
+      position: relative;
+    }
+
+    .section-title {
+      font-size: 24px;
+      font-weight: 900;
+      margin: 0 0 20px 0;
+      color: var(--text-main);
+      border-bottom: 2px solid rgba(255,255,255,0.1);
+      padding-bottom: 10px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .save-status {
+      font-size: 12px;
+      color: var(--primary);
+      font-weight: bold;
+      opacity: 0;
+      transition: opacity 0.3s;
+    }
+
+    .save-status.show { opacity: 1; }
+
+    .shop-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+      gap: 20px;
+      margin-bottom: 40px;
+    }
+
+    .shop-card {
+      background: var(--bg-panel);
+      border: 1px solid rgba(255,255,255,0.05);
+      border-radius: 16px;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      transition: transform 0.2s, background 0.2s;
+    }
+
+    .shop-card:hover {
+      transform: translateY(-4px);
+      background: rgba(40, 53, 75, 0.9);
+      border-color: rgba(255,255,255,0.15);
+    }
+
+    .card-header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 10px;
+    }
+
+    .card-icon {
+      font-size: 24px;
+      background: rgba(0,0,0,0.3);
+      width: 45px;
+      height: 45px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 10px;
+    }
+
+    .card-title {
+      font-size: 16px;
+      font-weight: 700;
+      margin: 0;
+    }
+
+    .card-lvl {
+      font-size: 11px;
+      color: var(--text-muted);
+      font-weight: 700;
+      margin-top: 4px;
+    }
+
+    .card-desc {
+      font-size: 13px;
+      color: var(--text-muted);
+      margin: 0 0 15px 0;
+      line-height: 1.4;
+      flex: 1;
+    }
+
+    .buy-btn {
+      background: rgba(255,255,255,0.1);
+      color: white;
+      border: 1px solid rgba(255,255,255,0.2);
+      padding: 10px;
+      font-size: 13px;
+      font-weight: 700;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.2s;
+      font-family: inherit;
+    }
+
+    .buy-btn:not(:disabled):hover {
+      background: var(--primary);
+      border-color: var(--primary);
+    }
+
+    .buy-btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      background: rgba(0,0,0,0.2);
+    }
+
+    /* --- MULTIPLAYER UI --- */
+    #mp-overlay {
+      position: absolute;
+      top: 0;
+      right: 0;
+      bottom: 0;
+      left: 350px; /* leaves the sidebar visible */
+      background: rgba(15, 23, 42, 0.98);
+      z-index: 50;
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .mp-container {
+      width: 500px;
+      max-width: calc(100% - 40px);
+      background: var(--bg-panel);
+      border: 2px solid rgba(255,255,255,0.1);
+      border-radius: 16px;
+      padding: 40px;
+      box-shadow: 0 20px 40px rgba(0,0,0,0.6);
+      text-align: center;
+    }
+
+    .mp-title {
+      font-size: 32px;
+      font-weight: 900;
+      margin: 0 0 10px 0;
+      color: var(--secondary);
+      text-transform: uppercase;
+      letter-spacing: 2px;
+    }
+
+    .mp-subtitle {
+      color: var(--text-muted);
+      margin-bottom: 30px;
+      font-size: 14px;
+    }
+
+    .mp-input {
+      width: 100%;
+      padding: 15px;
+      background: rgba(0,0,0,0.5);
+      border: 1px solid rgba(255,255,255,0.2);
+      border-radius: 8px;
+      color: white;
+      font-family: inherit;
+      font-size: 16px;
+      font-weight: bold;
+      text-align: center;
+      margin-bottom: 15px;
+      text-transform: uppercase;
+    }
+    
+    .mp-input:focus {
+      outline: none;
+      border-color: var(--secondary);
+    }
+
+    .mp-input::placeholder {
+      color: rgba(255,255,255,0.3);
+      text-transform: none;
+    }
+
+    select.mp-input {
+      cursor: pointer;
+    }
+
+    .mp-room-code {
+      font-size: 48px;
+      font-weight: 900;
+      letter-spacing: 10px;
+      color: var(--gold);
+      background: rgba(0,0,0,0.5);
+      padding: 20px;
+      border-radius: 12px;
+      border: 2px dashed var(--gold);
+      margin-bottom: 30px;
+    }
+
+    .mp-player-list {
+      background: rgba(0,0,0,0.3);
+      border-radius: 8px;
+      padding: 15px;
+      margin-bottom: 30px;
+      min-height: 150px;
+      text-align: left;
+    }
+
+    .mp-player-item {
+      padding: 10px;
+      border-bottom: 1px solid rgba(255,255,255,0.1);
+      display: flex;
+      justify-content: space-between;
+      font-weight: bold;
+    }
+    
+    .mp-player-item:last-child {
+      border-bottom: none;
+    }
+
+    .mp-host-badge {
+      background: var(--gold);
+      color: black;
+      font-size: 10px;
+      padding: 2px 6px;
+      border-radius: 4px;
+      vertical-align: middle;
+      margin-left: 10px;
+    }
+
+    .mp-view {
+      display: none;
+      flex-direction: column;
+    }
+    .mp-view.active {
+      display: flex;
+    }
+
+    /* --- MULTIPLAYER: status line, in-match HUD, match menu, results --- */
+    .mp-input { user-select: text; -webkit-user-select: text; } /* the global user-select:none blocks typing in Safari */
+
+    .mp-status {
+      min-height: 20px;
+      margin-top: 16px;
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--text-muted);
+    }
+    .mp-status.error { color: var(--danger); }
+    .mp-status.ok { color: var(--primary); }
+
+    .mp-room-code { cursor: pointer; }
+
+    .mp-dot {
+      display: inline-block;
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      margin-right: 8px;
+    }
+
+    #mp-panel {
+      position: absolute;
+      top: 56px;
+      right: 0;
+      width: 220px;
+      display: none;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .mp-panel-time {
+      align-self: flex-end;
+      font-size: 14px;
+      font-weight: 900;
+      letter-spacing: 1px;
+      color: var(--text-muted);
+      text-shadow: 1px 1px 2px black;
+    }
+
+    .mp-row {
+      background: rgba(0,0,0,0.55);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 8px;
+      padding: 6px 10px;
+      font-size: 13px;
+      font-weight: 700;
+    }
+    .mp-row.dead { opacity: 0.5; }
+
+    .mp-row-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .mp-row-name {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .mp-row-bar {
+      height: 4px;
+      margin-top: 5px;
+      background: rgba(255,255,255,0.12);
+      border-radius: 2px;
+      overflow: hidden;
+    }
+    .mp-row-bar > div { height: 100%; background: var(--primary); }
+
+    #mp-banner {
+      position: fixed;
+      top: 24px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 6;
+      display: none;
+      text-align: center;
+      background: rgba(0,0,0,0.65);
+      border: 1px solid rgba(239, 68, 68, 0.6);
+      border-radius: 10px;
+      padding: 10px 22px;
+      font-weight: 900;
+      pointer-events: none;
+    }
+    #mp-banner small {
+      display: block;
+      margin-top: 3px;
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--text-muted);
+    }
+
+    #mp-menu {
+      position: fixed;
+      top: 0; left: 0; width: 100vw; height: 100vh;
+      z-index: 40;
+      display: none;
+      justify-content: center;
+      align-items: center;
+      pointer-events: none; /* the match keeps running underneath, only the card is clickable */
+    }
+
+    .mp-menu-card {
+      pointer-events: auto;
+      width: 340px;
+      max-width: 90%;
+      text-align: center;
+      background: rgba(30, 41, 59, 0.95);
+      border: 2px solid rgba(255,255,255,0.1);
+      border-radius: 16px;
+      padding: 24px;
+      box-shadow: 0 20px 40px rgba(0,0,0,0.6);
+    }
+
+    .mp-results-list {
+      width: 440px;
+      max-width: 90vw;
+      min-height: 0;
+      margin-bottom: 24px;
+    }
+    .mp-results-list .mp-player-item.winner { color: var(--gold); }
+
+    /* the lobby window scrolls instead of getting its top cut off on short screens
+       (margin:auto still centres it when there is room; flex-start stops the centring from clipping when there isn't) */
+    #mp-overlay { overflow-y: auto; justify-content: flex-start; }
+    .mp-container { margin: auto; }
+
+    /* The shop's 40px top padding becomes an in-flow spacer, so the sticky party bar can stick near the top edge in every browser
+       (sticky offsets are measured inside the scroller's padding in some browsers). The shop looks exactly the same. */
+    .menu-content { padding-top: 0; }
+    .menu-content::before { content: ''; display: block; height: 40px; }
+
+    /* --- PARTY BAR: keep shopping while you're in a room --- */
+    .party-bar {
+      display: none;
+      position: sticky;
+      top: 12px;
+      z-index: 5;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px 20px;
+      margin-bottom: 28px;
+      padding: 12px 16px;
+      background: rgb(15, 23, 42);   /* fully opaque, shop cards scroll underneath it */
+      border: 1px solid rgba(255,255,255,0.1);
+      border-left: 4px solid var(--secondary);
+      border-radius: 12px;
+      box-shadow: 0 8px 20px rgba(0,0,0,0.4);
+    }
+    .party-info { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 16px; min-width: 0; }
+    .party-label { font-size: 11px; font-weight: 900; letter-spacing: 2px; color: var(--text-muted); }
+    .party-code { font-size: 20px; font-weight: 900; letter-spacing: 4px; color: var(--gold); cursor: pointer; }
+    .party-players { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 13px; font-weight: 700; }
+    .party-actions { display: flex; align-items: center; gap: 10px; }
+    .party-actions button { padding: 8px 14px; font-size: 13px; }
+    .party-actions .play-btn { letter-spacing: 1px; box-shadow: none; }
+    .party-wait { font-size: 13px; font-weight: 700; color: var(--text-muted); }
+
+    /* --- MULTIPLAYER FUN: game mode picker, announcer, kill feed, boss bar, power-up timers, results extras --- */
+    .mp-mode { margin: 0 0 14px 0; }
+    .mp-mode-btns { display: flex; gap: 8px; }
+    .mp-mode-btn {
+      flex: 1; padding: 10px 6px; font-family: inherit; font-size: 13px; font-weight: 900; letter-spacing: 1px;
+      color: var(--text-muted); background: rgba(0,0,0,0.3); border: 2px solid rgba(255,255,255,0.1); border-radius: 10px; cursor: pointer;
+    }
+    .mp-mode-btn.active { color: #fff; border-color: var(--secondary); background: rgba(59,130,246,0.22); }
+    .mp-mode-btn:disabled { cursor: default; }
+    .mp-mode-desc { margin: 8px 2px 0; font-size: 12px; font-weight: 600; line-height: 1.45; color: var(--text-muted); min-height: 52px; }
+    #mp-view-lobby .mp-room-code { font-size: 40px; padding: 12px; margin-bottom: 14px; }
+    #mp-view-lobby .mp-player-list { min-height: 0; padding: 8px 15px; margin-bottom: 18px; }
+    #mp-view-lobby .mp-subtitle { margin-bottom: 14px; }
+
+    .party-mode { font-size: 11px; font-weight: 900; letter-spacing: 1px; color: var(--text-muted); background: rgba(255,255,255,0.06); padding: 3px 8px; border-radius: 6px; }
+
+    #mp-banner { top: 92px; }
+    #mp-announce { position: fixed; top: 150px; left: 50%; transform: translateX(-50%); z-index: 7; pointer-events: none; display: grid; justify-items: center; }
+    .announce-item {
+      grid-area: 1 / 1; text-align: center; font-size: 46px; font-weight: 900; letter-spacing: 4px; color: var(--gold);
+      text-shadow: 0 4px 24px rgba(0,0,0,0.85); white-space: nowrap; animation: announcePop 2.6s ease-out forwards;
+    }
+    .announce-item small { display: block; margin-top: 4px; font-size: 15px; letter-spacing: 2px; color: #fff; text-shadow: 0 2px 8px rgba(0,0,0,0.9); }
+    .announce-item.warn, .announce-item.boss { color: #ef4444; }
+    .announce-item.moon { color: #fb7185; }
+    .announce-item.win { color: var(--primary); }
+    .announce-item.drop { color: #22d3ee; }
+    @keyframes announcePop {
+      0% { opacity: 0; transform: scale(0.6); }
+      10% { opacity: 1; transform: scale(1.1); }
+      18% { transform: scale(1); }
+      78% { opacity: 1; }
+      100% { opacity: 0; transform: translateY(-14px); }
+    }
+
+    #mp-feed { position: fixed; left: 20px; top: 150px; z-index: 6; display: flex; flex-direction: column; gap: 4px; pointer-events: none; max-width: 360px; }
+    .feed-line {
+      background: rgba(0,0,0,0.55); border-left: 3px solid var(--secondary); padding: 5px 10px; border-radius: 6px;
+      font-size: 13px; font-weight: 700; animation: feedIn 0.25s ease-out, feedOut 0.6s ease-in 6.4s forwards;
+    }
+    @keyframes feedIn { from { opacity: 0; transform: translateX(-12px); } to { opacity: 1; transform: none; } }
+    @keyframes feedOut { to { opacity: 0; } }
+
+    #mp-bossbar { position: fixed; top: 20px; left: 50%; transform: translateX(-50%); width: 440px; max-width: 70vw; z-index: 6; display: none; pointer-events: none; }
+    .boss-row { margin-bottom: 6px; }
+    .boss-name { text-align: center; font-size: 14px; font-weight: 900; letter-spacing: 3px; color: #fca5a5; text-shadow: 0 2px 8px rgba(0,0,0,0.9); margin-bottom: 3px; }
+    .boss-hp { height: 14px; background: rgba(0,0,0,0.7); border: 2px solid #7f1d1d; border-radius: 8px; overflow: hidden; }
+    .boss-hp > div { height: 100%; background: linear-gradient(90deg, #dc2626, #f97316); transition: width 0.15s; }
+
+    #hud-buffs { font-weight: 800; letter-spacing: 1px; color: #fde68a; }
+
+    .mp-results-list { width: 580px; }
+    .mp-badge { margin-left: 8px; font-size: 11px; font-weight: 800; padding: 2px 7px; border-radius: 6px; background: rgba(251,191,36,0.15); color: var(--gold); white-space: nowrap; }
+    .mp-stats { color: var(--text-muted); font-size: 13px; white-space: nowrap; padding-left: 12px; }
+    .mp-results-bonus { margin: -8px 0 22px; text-align: center; font-weight: 800; color: var(--gold); line-height: 1.7; }
+    .mp-results-bonus small { color: var(--text-muted); font-weight: 600; }
+    .mp-results-bonus .fresh { color: var(--primary); }
+
+    /* --- CUSTOM MODAL UI --- */
+    .modal-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      background: rgba(0,0,0,0.8);
+      z-index: 1000;
+      display: none;
+      justify-content: center;
+      align-items: center;
+      backdrop-filter: blur(5px);
+    }
+
+    .modal-box {
+      background: #1e293b;
+      border: 2px solid rgba(255,255,255,0.1);
+      border-radius: 16px;
+      padding: 30px;
+      width: 400px;
+      max-width: 90%;
+      text-align: center;
+      box-shadow: 0 20px 40px rgba(0,0,0,0.6);
+    }
+
+    .modal-title { font-size: 22px; font-weight: 900; margin: 0 0 15px 0; color: var(--gold); }
+    .modal-desc { font-size: 14px; color: var(--text-muted); margin-bottom: 20px; }
+    .modal-textarea {
+      width: 100%; height: 100px; background: rgba(0,0,0,0.5);
+      border: 1px solid rgba(255,255,255,0.2); color: white; padding: 10px;
+      font-family: monospace; font-size: 12px; border-radius: 8px; resize: none;
+      margin-bottom: 20px; user-select: text;
+    }
+    .modal-textarea:focus { outline: none; border-color: var(--primary); }
+    .modal-btns { display: flex; gap: 10px; }
+    .modal-btns button { flex: 1; padding: 10px; font-size: 14px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; }
+
+    /* --- ADMIN PANEL --- */
+    #admin-panel {
+      position: absolute;
+      top: 60px;
+      right: 20px;
+      width: 250px;
+      background: rgba(15, 23, 42, 0.95);
+      border: 2px solid var(--danger);
+      border-radius: 12px;
+      padding: 15px;
+      z-index: 1000;
+      display: none;
+      flex-direction: column;
+      gap: 10px;
+      box-shadow: 0 0 20px rgba(239, 68, 68, 0.4);
+    }
+
+    #admin-panel h2 {
+      color: var(--danger);
+      margin: 0 0 10px 0;
+      font-size: 18px;
+      text-align: center;
+      text-transform: uppercase;
+      font-weight: 900;
+    }
+
+    .admin-btn {
+      background: rgba(0,0,0,0.5);
+      color: white;
+      border: 1px solid rgba(255,255,255,0.2);
+      padding: 10px;
+      font-family: inherit;
+      font-weight: 700;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .admin-btn:hover {
+      background: var(--danger);
+      border-color: var(--danger);
+    }
+  </style>
+</head>
+<body>
+
+  <canvas id="gameCanvas"></canvas>
+  
+  <div id="hud">
+    <div class="health-bar-container" id="hp-container">
+      <div id="health-bar-fill"></div>
+      <div id="shield-bar-fill"></div>
+      <div id="health-text">100 / 100</div>
+    </div>
+    <div class="hud-stats-row">
+      <div class="stat-display gold">🪙 <span id="hud-coins">0</span></div>
+      <div class="stat-display"><span id="hud-gun-icon">🔫</span> <span id="hud-gun-name">Pistol</span> (<span id="hud-ammo">12 / 12</span>)</div>
+      <div id="hud-buffs" class="stat-display" style="display:none;"></div>
+    </div>
+    <div id="reloading-warning">RELOADING...</div>
+    
+    <button id="pause-btn" onclick="togglePause()">⏸ PAUSE (P)</button>
+
+    <div id="mp-panel"></div>
+    <div id="mp-bossbar"></div>
+    <div id="mp-announce"></div>
+    <div id="mp-feed"></div>
+
+    <div class="inventory-bar">
+      <div class="inv-slot">🩹 <span id="hud-medkit">0</span> <div class="hotkey">Q</div></div>
+      <div class="inv-slot">🥫 <span id="hud-food">0</span> <div class="hotkey">E</div></div>
+      <div class="inv-slot">🛡️ <span id="hud-shield">0</span> <div class="hotkey">3</div></div>
+      <div class="inv-slot">🤖 <span id="hud-turret">0</span> <div class="hotkey">1</div></div>
+      <div class="inv-slot">👮 <span id="hud-bodyguard">0</span> <div class="hotkey">2</div></div>
+    </div>
+  </div>
+
+  <div id="pause-overlay">
+    <h1 class="pause-text">PAUSED</h1>
+    <p style="color: #94a3b8; font-size: 20px; font-weight: 700; margin-top: 10px;">Press 'P' to Resume</p>
+  </div>
+
+  <div id="main-menu">
+    <div class="menu-sidebar">
+      <h1 class="game-title">Zombie<br>Survivors</h1>
+      
+      <div class="menu-stats-box">
+        <h3>Available Funds</h3>
+        <div class="menu-coins">🪙 <span id="menu-coins-display">0</span></div>
+      </div>
+      
+      <div class="btn-group">
+        <button class="play-btn" onclick="startSolo()">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+          SOLO PLAY
+        </button>
+        <!-- MULTIPLAYER BUTTON ADDED HERE -->
+        <button class="play-btn" style="background: var(--secondary); box-shadow: 0 8px 15px rgba(59, 130, 246, 0.3);" onclick="openMultiplayerUI()">
+          🌐 MULTIPLAYER
+        </button>
+
+        <div style="display: flex; gap: 10px; margin-top: 5px;">
+          <button class="save-btn" style="flex: 1;" onclick="exportNewSave()">📥 Get Code</button>
+          <button class="save-btn" style="flex: 1;" onclick="importNewSave()">📤 Load Code</button>
+        </div>
+        <button class="reset-btn" onclick="showResetModal()">Wipe Save</button>
+        <button class="save-btn" style="margin-top: 10px; border-color: var(--text-muted); color: var(--text-muted);" onclick="openSettings()">⚙️ Settings</button>
+      </div>
+    </div>
+
+    <div class="menu-content">
+      <!-- PARTY BAR: shows while you are in a multiplayer room and the lobby window is closed, so you can keep shopping -->
+      <div id="party-bar" class="party-bar">
+        <div class="party-info">
+          <span class="party-label">PARTY</span>
+          <span id="party-code" class="party-code" onclick="copyRoomCode()" title="Click to copy">----</span>
+          <span id="party-mode" class="party-mode"></span>
+          <span id="party-players" class="party-players"></span>
+        </div>
+        <div class="party-actions">
+          <button class="save-btn" onclick="openMultiplayerUI()">LOBBY</button>
+          <button id="party-start" class="play-btn" onclick="startMultiplayerMatch()">START MATCH</button>
+          <span id="party-wait" class="party-wait">Waiting for host…</span>
+          <button class="reset-btn" onclick="leaveLobby()">LEAVE</button>
+        </div>
+      </div>
+
+      <h2 class="section-title">
+        WEAPONRY
+        <span id="save-status-msg" class="save-status">💾 Game Saved!</span>
+      </h2>
+      <div class="shop-grid" id="shop-grid-guns"></div>
+
+      <h2 class="section-title">SURVIVOR UPGRADES</h2>
+      <div class="shop-grid" id="shop-grid-upgrades"></div>
+
+      <h2 class="section-title">ITEMS & DEFENSES</h2>
+      <div class="shop-grid" id="shop-grid-items"></div>
+
+    </div>
+
+    <!-- MULTIPLAYER OVERLAY: covers the shop, the sidebar stays visible. It lives outside .menu-content so it does not scroll away with the shop -->
+    <div id="mp-overlay">
+      <div class="mp-container">
+        
+        <!-- View 1: Multiplayer Hub -->
+        <div id="mp-view-hub" class="mp-view active">
+          <h2 class="mp-title">Multiplayer</h2>
+          <p class="mp-subtitle">Survive together, or fight to be the last one standing.</p>
+          <div style="display:flex; flex-direction:column; gap:15px;">
+            <button class="play-btn" style="background: var(--secondary);" onclick="switchMpView('mp-view-create')">CREATE ROOM</button>
+            <button class="play-btn" onclick="switchMpView('mp-view-join')">JOIN ROOM</button>
+            <button class="reset-btn" style="margin-top:20px;" onclick="closeMultiplayerUI()">BACK TO MENU</button>
+          </div>
+        </div>
+
+        <!-- View 2: Create Room -->
+        <div id="mp-view-create" class="mp-view">
+          <h2 class="mp-title">Create Room</h2>
+          <p class="mp-subtitle">Host a private match for your friends.</p>
+          <input type="text" id="host-nickname" class="mp-input" placeholder="Your Nickname" maxlength="12">
+          <select id="room-max-players" class="mp-input">
+            <option value="2">Max Players: 2</option>
+            <option value="3">Max Players: 3</option>
+            <option value="4">Max Players: 4</option>
+            <option value="5">Max Players: 5</option>
+          </select>
+          <div style="display:flex; gap:10px; margin-top:20px;">
+            <button class="reset-btn" style="flex:1;" onclick="switchMpView('mp-view-hub')">CANCEL</button>
+            <button class="play-btn" style="flex:2; background: var(--secondary);" onclick="generateRoom()">GENERATE ROOM</button>
+          </div>
+        </div>
+
+        <!-- View 3: Join Room -->
+        <div id="mp-view-join" class="mp-view">
+          <h2 class="mp-title">Join Room</h2>
+          <p class="mp-subtitle">Enter the 4-character room code from your host.</p>
+          <input type="text" id="join-nickname" class="mp-input" placeholder="Your Nickname" maxlength="12">
+          <input type="text" id="join-room-code" class="mp-input" placeholder="Room Code" maxlength="4" style="font-size:24px; letter-spacing:5px;">
+          <div style="display:flex; gap:10px; margin-top:20px;">
+            <button class="reset-btn" style="flex:1;" onclick="switchMpView('mp-view-hub')">CANCEL</button>
+            <button class="play-btn" style="flex:2;" onclick="attemptJoinRoom()">JOIN GAME</button>
+          </div>
+        </div>
+
+        <!-- View 4: The Lobby -->
+        <div id="mp-view-lobby" class="mp-view">
+          <h2 class="mp-title" style="margin-bottom:0;">Lobby</h2>
+          <p class="mp-subtitle">Give this code to your friends.</p>
+          
+          <div class="mp-room-code" id="display-room-code" onclick="copyRoomCode()" title="Click to copy">----</div>
+
+          <div id="lobby-mode" class="mp-mode">
+            <div class="mp-mode-btns">
+              <button id="mode-coop" class="mp-mode-btn" onclick="setRoomMode('coop')">🤝 CO-OP</button>
+              <button id="mode-last" class="mp-mode-btn" onclick="setRoomMode('last')">⚔️ LAST STANDING</button>
+            </div>
+            <p id="mode-desc" class="mp-mode-desc"></p>
+          </div>
+          
+          <div class="mp-player-list" id="lobby-player-list">
+            <!-- Players injected via JS -->
+          </div>
+
+          <div style="display:flex; gap:10px; margin-top:10px;">
+            <button class="reset-btn" style="flex:1;" onclick="leaveLobby()">LEAVE</button>
+            <button id="btn-start-match" class="play-btn" style="flex:2; background:var(--primary);" onclick="startMultiplayerMatch()">START MATCH</button>
+          </div>
+          <button class="save-btn" style="width: 100%; margin-top: 12px;" onclick="closeMultiplayerUI()">🛒 SHOP WHILE YOU WAIT</button>
+          <p id="lobby-waiting-text" style="display:none; color:var(--text-muted); font-weight:bold; margin-top:15px;">Waiting for host to start...</p>
+        </div>
+
+        <!-- Status / error messages for every view -->
+        <div id="mp-status" class="mp-status"></div>
+
+      </div>
+    </div>
+  </div>
+
+  <div id="admin-panel">
+    <h2>⚙️ Admin Console</h2>
+    <button class="admin-btn" onclick="adminAddCoins()">💰 Add 10,000 Coins</button>
+    <button class="admin-btn" id="btn-godmode" onclick="adminToggleGodMode()">🛡️ God Mode: OFF</button>
+    <button class="admin-btn" onclick="adminMaxUpgrades()">⚡ Max Upgrades</button>
+    <button class="admin-btn" id="btn-infammo" onclick="adminToggleInfAmmo()">🔫 Inf Ammo: OFF</button>
+    <button class="admin-btn" onclick="adminSpawnZombies()">🧟 Spawn 10 Zombies</button>
+  </div>
+
+  <div id="custom-modal" class="modal-overlay">
+    <div class="modal-box">
+      <h3 id="modal-title" class="modal-title">TITLE</h3>
+      <p id="modal-desc" class="modal-desc">Description text</p>
+      <textarea id="modal-textarea" class="modal-textarea"></textarea>
+      <div class="modal-btns">
+        <button id="modal-action-btn" class="play-btn" style="color: white;">ACTION</button>
+        <button class="reset-btn" onclick="closeModal()">CLOSE</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Settings Modal -->
+  <div id="settings-modal" class="modal-overlay">
+    <div class="modal-box">
+      <h3 class="modal-title">SETTINGS</h3>
+      <div style="display:flex; flex-direction:column; gap:15px; margin-bottom:20px;">
+        <button id="toggle-blood-btn" class="admin-btn" onclick="toggleSetting('blood')">🩸 Blood Particles: ON</button>
+        <button id="toggle-death-btn" class="admin-btn" onclick="toggleSetting('deathScreen')">💀 Death Screen: ON</button>
+      </div>
+      <div class="modal-btns">
+        <button class="reset-btn" onclick="closeSettings()">CLOSE</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Death Screen Overlay -->
+  <div id="death-screen" class="modal-overlay" style="background: rgba(15, 23, 42, 0.95); flex-direction: column;">
+    <h1 class="pause-text" style="color: var(--danger); text-shadow: 0 0 30px rgba(239, 68, 68, 0.5);">YOU DIED</h1>
+    <p id="death-stats" style="color: white; font-size: 20px; margin: 20px 0; font-weight: bold;"></p>
+    <button class="play-btn" style="width: 200px;" onclick="confirmDeath()">MAIN MENU</button>
+  </div>
+
+  <!-- Multiplayer: spectate banner -->
+  <div id="mp-banner"></div>
+
+  <!-- Multiplayer: in-match menu (the match keeps running while it is open) -->
+  <div id="mp-menu">
+    <div class="mp-menu-card">
+      <h3 class="modal-title" style="margin-bottom: 8px;">MATCH MENU</h3>
+      <p class="modal-desc" style="margin-bottom: 12px;">The match keeps running while this is open.</p>
+      <p id="mp-menu-host-note" class="modal-desc" style="display: none; color: var(--gold); margin-bottom: 12px;">You're the host, so leaving ends the match for everyone.</p>
+      <div class="modal-btns">
+        <button class="reset-btn" onclick="leaveMatch()">LEAVE MATCH</button>
+        <button class="play-btn" style="padding: 10px; font-size: 14px;" onclick="toggleMatchMenu(false)">RESUME</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Multiplayer: results screen -->
+  <div id="mp-results" class="modal-overlay" style="background: rgba(15, 23, 42, 0.95); flex-direction: column;">
+    <h1 id="mp-results-title" class="pause-text" style="font-size: 56px;">MATCH OVER</h1>
+    <p id="mp-results-sub" style="color: white; font-size: 18px; margin: 12px 0 20px; font-weight: bold;"></p>
+    <div id="mp-results-list" class="mp-player-list mp-results-list"></div>
+    <p id="mp-results-bonus" class="mp-results-bonus"></p>
+    <div style="display: flex; gap: 12px;">
+      <button class="reset-btn" style="min-width: 150px;" onclick="mpResultsToMenu()">MAIN MENU</button>
+      <button class="play-btn" style="min-width: 200px; background: var(--secondary);" onclick="mpResultsToLobby()">BACK TO LOBBY</button>
+    </div>
+  </div>
+
+  <script>
+    const canvas = document.getElementById("gameCanvas");
+    const ctx = canvas.getContext("2d");
+
+    function resize() {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+    }
+    window.addEventListener('resize', resize);
+    resize();
+
+    // --- AUDIO SYSTEM ---
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+    const menuMusic = new Audio('https://dl.dropboxusercontent.com/scl/fi/ivk2zs1y8zcz869ccomjg/zombiesur-mainmenu.mp3?rlkey=xz17jvhlhbn3b3s1scf82fn6t&st=bsba64s5&dl=0');
+    menuMusic.loop = true;
+    menuMusic.volume = 0.4;
+
+    function playTone(freq, type, duration, endFreq = null, vol = 0.05) {
+      if (audioCtx.state === 'suspended') audioCtx.resume();
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.type = type;
+      osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+      if (endFreq) osc.frequency.exponentialRampToValueAtTime(endFreq, audioCtx.currentTime + duration);
+      gain.gain.setValueAtTime(vol, audioCtx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
+      
+      osc.connect(gain); gain.connect(audioCtx.destination);
+      osc.start(); osc.stop(audioCtx.currentTime + duration);
+    }
+
+    function playNoise(duration, vol = 0.05) {
+      if (audioCtx.state === 'suspended') audioCtx.resume();
+      const bufferSize = audioCtx.sampleRate * duration;
+      const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+      const data = buffer.getChannelData(0);
+      for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
+      
+      const noise = audioCtx.createBufferSource();
+      noise.buffer = buffer;
+      const gain = audioCtx.createGain();
+      gain.gain.setValueAtTime(vol, audioCtx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
+      
+      noise.connect(gain); gain.connect(audioCtx.destination);
+      noise.start();
+    }
+
+    const SFX = {
+      shoot: () => playTone(600, 'square', 0.12, 100, 0.05),
+      shotgun: () => playNoise(0.2, 0.08),
+      rifle: () => playTone(450, 'sawtooth', 0.08, 120, 0.04),
+      plasma: () => playTone(900, 'sine', 0.25, 200, 0.06),
+      turretShoot: () => playTone(800, 'square', 0.1, 300, 0.02),
+      hit: () => playNoise(0.1, 0.05),
+      hurt: () => playTone(150, 'sawtooth', 0.3, 50, 0.1),
+      empty: () => playTone(400, 'sine', 0.05, 400, 0.02),
+      reloadStart: () => playTone(200, 'square', 0.1, 200, 0.02),
+      reloadEnd: () => playTone(300, 'square', 0.1, 300, 0.02),
+      build: () => playTone(300, 'sine', 0.2, 600, 0.05),
+      shield: () => playTone(400, 'sine', 0.4, 800, 0.05),
+      wave: () => { playTone(330, 'square', 0.15, 330, 0.04); setTimeout(() => playTone(440, 'square', 0.15, 440, 0.04), 160); setTimeout(() => playTone(660, 'square', 0.3, 660, 0.05), 320); },
+      siren: () => { for (let i = 0; i < 4; i++) setTimeout(() => playTone(i % 2 ? 500 : 700, 'sawtooth', 0.25, i % 2 ? 700 : 500, 0.05), i * 260); },
+      boss: () => { playTone(90, 'sawtooth', 1.0, 40, 0.12); setTimeout(() => playTone(70, 'sawtooth', 0.8, 35, 0.1), 400); },
+      pickup: () => playTone(700, 'sine', 0.15, 1400, 0.05),
+      revive: () => { playTone(400, 'sine', 0.2, 800, 0.06); setTimeout(() => playTone(800, 'sine', 0.3, 1200, 0.06), 180); },
+      nuke: () => { playNoise(0.8, 0.15); playTone(120, 'sawtooth', 0.8, 30, 0.12); },
+      down: () => playTone(220, 'sawtooth', 0.5, 60, 0.08)
+    };
+
+    // UI Elements
+    const mainMenu = document.getElementById("main-menu");
+    const hud = document.getElementById("hud");
+    const hpContainer = document.getElementById("hp-container");
+    const healthFill = document.getElementById("health-bar-fill");
+    const shieldFill = document.getElementById("shield-bar-fill");
+    const healthText = document.getElementById("health-text");
+    const hudCoins = document.getElementById("hud-coins");
+    const hudAmmo = document.getElementById("hud-ammo");
+    const hudGunIcon = document.getElementById("hud-gun-icon");
+    const hudGunName = document.getElementById("hud-gun-name");
+    const reloadWarning = document.getElementById("reloading-warning");
+    const menuCoinsDisplay = document.getElementById("menu-coins-display");
+    const saveStatusMsg = document.getElementById("save-status-msg");
+    const pauseOverlay = document.getElementById("pause-overlay");
+    const pauseBtn = document.getElementById("pause-btn");
+
+    // Modal
+    const customModal = document.getElementById("custom-modal");
+    const modalTitle = document.getElementById("modal-title");
+    const modalDesc = document.getElementById("modal-desc");
+    const modalTextarea = document.getElementById("modal-textarea");
+    const modalActionBtn = document.getElementById("modal-action-btn");
+
+    // Game Constants & State
+    let isPlaying = false;
+    let isPaused = false;
+    let pauseStartTime = 0;
+    let animationId;
+    let frameCount = 0;
+    let zombieIdCounter = 0;
+    let coins = 0;
+    let settings = { blood: true, deathScreen: true }; 
+    
+    // --- MULTIPLAYER (REAL NETWORKING) ---
+    // Uses WebRTC through PeerJS, so you don't need to run a game server.
+    //  * The room HOST runs the zombie simulation (it acts as the server).
+    //  * Everyone, host included, moves / aims / shoots / takes damage locally, so controls feel instant.
+    //  * Guests send their state, shots and hits to the host ~20x per second.
+    //    The host answers with a snapshot of the world (players, zombies, turrets, bodyguards).
+    //  * Last survivor wins. If everybody dies, whoever lasted longest wins.
+    const MP_PEER_PREFIX = 'zombiesurvivors-';
+    const MP_PROTOCOL = 2;
+    const MP_COLORS = ['#3b82f6', '#f97316', '#a855f7', '#ec4899', '#22d3ee'];
+    const NET_EVERY = 3;                                          // one network update every 3 game ticks (~20 per second)
+    const ZOMBIE_TYPES = ['normal', 'runner', 'tank', 'boss'];          // if you add a new zombie type, add it here too (the order is what gets sent over the network)
+    const ROOM_CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';   // no 0/O or 1/I mix-ups
+
+    const mpOverlay = document.getElementById("mp-overlay");
+    const mpStatusEl = document.getElementById("mp-status");
+    const zombieMap = new Map();      // zombie id -> Zombie (always kept in sync with the zombies array)
+    let aiTargets = [];               // living players that zombies / bodyguards can react to this tick
+    let defenseIdCounter = 0;
+
+    const net = {
+      active: false,        // true while inside a room (lobby, match or results screen)
+      state: 'idle',        // idle | lobby | playing | results
+      isHost: false,
+      busy: false,          // a create / join attempt is in progress
+      peer: null,           // the PeerJS peer
+      hostConn: null,       // guests: the connection to the host
+      code: '', max: 4, myId: 0, name: 'Player',
+      roster: {},           // slot id -> player entry (slot 0 is always the host)
+      startCount: 1,        // how many players the current match started with
+      outShots: [], outHits: [], outPlace: [],   // guest -> host, flushed every network tick
+      hostShots: [],                              // host -> guests, flushed every network tick
+      localDead: new Map(), // guest: zombies I already killed locally, waiting for the host to confirm
+      spectateId: -1,
+      view: { x: 0, y: 0 },
+      lastSnapAt: 0,
+      mode: 'coop',                               // 'coop' or 'last' (last standing), chosen by the host in the lobby
+      wave: 1, moon: false, waveLeft: 0,          // what the host tells everybody about the current wave
+      bosses: [],                                 // [id, nameIndex, hp, maxHp, x, y] for the boss bar and the arrows
+      outPick: [], outHaunt: false,               // guest -> host: power-ups I touched, "send a zombie"
+      hostEvents: []                              // host -> guests: things everybody should see (wave, boss, revive...)
+    };
+
+    // ---------- small helpers ----------
+    const num = (v, d) => (typeof v === 'number' && isFinite(v)) ? v : d;
+    const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
+    const rnd1 = v => Math.round(v * 10) / 10;
+    const rnd3 = v => Math.round(v * 1000) / 1000;
+    const colorOf = id => MP_COLORS[id % MP_COLORS.length];
+    const gunKeys = () => Object.keys(defaultGuns);                // guns are sent over the network as their position in this list
+
+    function esc(s) {
+      return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    }
+    function cleanName(v, fallback) {
+      const s = String(v == null ? '' : v).replace(/[\u0000-\u001f<>&"']/g, '').trim().slice(0, 12);
+      return s || fallback;
+    }
+    function fmtTime(sec) {
+      sec = Math.max(0, Math.floor(sec));
+      return Math.floor(sec / 60) + ':' + String(sec % 60).padStart(2, '0');
+    }
+    function rosterList() { return Object.values(net.roster).sort((a, b) => a.id - b.id); }
+    function netSend(conn, msg) {
+      if (!conn || !conn.open) return;
+      try { conn.send(msg); } catch (e) { console.warn('Send failed', e); }
+    }
+    function newRosterEntry(id, name, isHost, conn) {
+      return {
+        id, name, isHost, conn: conn || null,
+        alive: true, left: false, deathTick: 0, lastRx: Date.now(),
+        x: 0, y: 0, a: 0, hp: 100, mhp: 100, sh: 0, g: 0, rl: 0, hl: 0,   // last known state
+        vw: 1280, vh: 720, cx: 0, cy: 0,                                  // their screen size + camera centre
+        dx: 0, dy: 0, da: 0,                                              // smoothed position used for drawing
+        evq: [],                                                          // host: events waiting to be sent to this guest
+        downed: false, rv: 0, dt: 0, bf: 0, life: 0, respawnAt: 0, haunt: 1,  // co-op revive state, power-up flags, respawn count, ghost charges
+        kills: 0, dmg: 0, rev: 0, deaths: 0, boss: 0                          // match stats (the host counts them)
+      };
+    }
+
+    // ---------- lobby UI ----------
+    function mpSetStatus(text, kind) {
+      mpStatusEl.textContent = text || '';
+      mpStatusEl.className = 'mp-status' + (kind ? ' ' + kind : '');
+    }
+
+    function openMultiplayerUI() {
+      mpOverlay.style.display = "flex";
+      updatePartyBar();
+      mpSetStatus('');
+      if (net.active && (net.state === 'lobby' || net.state === 'results')) { renderLobbyList(); switchMpView('mp-view-lobby'); }
+      else switchMpView('mp-view-hub');
+      loadPeerLib().catch(() => {});      // warm up so Create / Join feel instant
+    }
+
+    // Closing the lobby window does NOT leave the room: the party bar takes over so you can keep shopping
+    function closeMultiplayerUI() {
+      mpOverlay.style.display = "none";
+      updatePartyBar();
+    }
+
+    // Slim bar at the top of the shop while you're in a room (and the lobby window is closed)
+    function updatePartyBar() {
+      const bar = document.getElementById('party-bar');
+      const show = net.active && net.state === 'lobby' && mpOverlay.style.display !== 'flex';
+      bar.style.display = show ? 'flex' : 'none';
+      if (!show) return;
+      const players = rosterList();
+      document.getElementById('party-code').textContent = net.code;
+      document.getElementById('party-mode').textContent = MODE_INFO[net.mode === 'last' ? 'last' : 'coop'].label;
+      document.getElementById('party-players').innerHTML = players.map(p =>
+        `<span><span class="mp-dot" style="background:${colorOf(p.id)}"></span>${esc(p.name)}${p.id === net.myId ? ' (you)' : ''}${p.isHost ? ' <span class="mp-host-badge">HOST</span>' : ''}</span>`
+      ).join('') + `<span style="color: var(--text-muted);">${players.length}/${net.max}</span>`;
+      document.getElementById('party-start').style.display = net.isHost ? '' : 'none';
+      document.getElementById('party-wait').style.display = net.isHost ? 'none' : '';
+    }
+
+    function switchMpView(viewId) {
+      document.querySelectorAll('.mp-view').forEach(v => v.classList.remove('active'));
+      document.getElementById(viewId).classList.add('active');
+    }
+
+    function renderLobbyList() {
+      document.getElementById("display-room-code").innerText = net.code || '----';
+      document.getElementById("btn-start-match").style.display = net.isHost ? "block" : "none";
+      document.getElementById("lobby-waiting-text").style.display = net.isHost ? "none" : "block";
+
+      const mode = net.mode === 'last' ? 'last' : 'coop';
+      document.getElementById('mode-coop').classList.toggle('active', mode === 'coop');
+      document.getElementById('mode-last').classList.toggle('active', mode === 'last');
+      document.getElementById('mode-coop').disabled = document.getElementById('mode-last').disabled = !net.isHost;
+      document.getElementById('mode-desc').textContent = MODE_INFO[mode].desc;
+
+      const players = rosterList();
+      let html = '';
+      players.forEach(p => {
+        html += `
+          <div class="mp-player-item">
+            <span><span class="mp-dot" style="background:${colorOf(p.id)}"></span>${esc(p.name)}${p.id === net.myId ? ' (you)' : ''} ${p.isHost ? '<span class="mp-host-badge">HOST</span>' : ''}</span>
+            <span style="color: var(--primary);">Ready</span>
+          </div>
+        `;
+      });
+      // Show empty slots
+      for (let i = players.length; i < net.max; i++) {
+        html += `
+          <div class="mp-player-item" style="color: rgba(255,255,255,0.2);">
+            <span>[ Empty Slot ]</span>
+            <span>Waiting...</span>
+          </div>
+        `;
+      }
+      document.getElementById("lobby-player-list").innerHTML = html;
+      updatePartyBar();
+    }
+
+    function copyRoomCode() {
+      if (!net.code) return;
+      const done = () => mpSetStatus('Room code copied.', 'ok');
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(net.code).then(done).catch(() => {});
+        return;
+      }
+      try {                                                         // older browsers
+        const ta = document.createElement('textarea');
+        ta.value = net.code; ta.style.cssText = 'position:fixed; opacity:0; user-select:text;';
+        document.body.appendChild(ta); ta.select();
+        if (document.execCommand('copy')) done();
+        ta.remove();
+      } catch (e) {}
+    }
+
+    function showMpNotice(title, text) {
+      modalTitle.textContent = title;
+      modalDesc.textContent = text;
+      modalTextarea.style.display = "none";
+      modalActionBtn.textContent = "OK";
+      modalActionBtn.style.backgroundColor = "var(--secondary)";
+      modalActionBtn.onclick = closeModal;
+      customModal.style.display = 'flex';
+    }
+
+    // ---------- loading PeerJS on demand ----------
+    let peerLibPromise = null;
+    function getPeerCtor() { return window.Peer || (window.peerjs && window.peerjs.Peer); }
+
+    function loadPeerLib() {
+      if (getPeerCtor()) return Promise.resolve();
+      if (peerLibPromise) return peerLibPromise;
+      const sources = [
+        'https://cdn.jsdelivr.net/npm/peerjs@1.5.5/dist/peerjs.min.js',
+        'https://unpkg.com/peerjs@1.5.5/dist/peerjs.min.js'
+      ];
+      peerLibPromise = new Promise((resolve, reject) => {
+        let i = 0;
+        const tryNext = () => {
+          if (i >= sources.length) { peerLibPromise = null; reject(new Error('PeerJS failed to load')); return; }
+          const s = document.createElement('script');
+          s.src = sources[i++];
+          s.onload = () => (getPeerCtor() ? resolve() : tryNext());
+          s.onerror = () => { s.remove(); tryNext(); };
+          document.head.appendChild(s);
+        };
+        tryNext();
+      });
+      return peerLibPromise;
+    }
+
+    // ---------- leaving / cleaning up ----------
+    function resetNet(destroyDelay) {
+      const peer = net.peer;
+      net.peer = null; net.hostConn = null;
+      net.active = false; net.state = 'idle'; net.isHost = false;
+      net.roster = {}; net.code = '';
+      net.outShots = []; net.outHits = []; net.outPlace = []; net.hostShots = [];
+      net.outPick = []; net.outHaunt = false; net.hostEvents = [];
+      net.localDead.clear();
+      updatePartyBar();
+      if (!peer) return;
+      const kill = () => { try { peer.destroy(); } catch (e) {} };
+      if (destroyDelay) setTimeout(kill, destroyDelay); else kill();
+    }
+
+    function sendGoodbye() {
+      if (!net.active) return;
+      if (net.isHost) rosterList().forEach(r => r.conn && netSend(r.conn, { t: 'closed', reason: 'The host closed the room.' }));
+      else netSend(net.hostConn, { t: 'leave' });
+    }
+
+    function leaveLobby() {
+      sendGoodbye();
+      resetNet(300);                       // short delay so the goodbye message gets out first
+      switchMpView('mp-view-hub');
+      mpSetStatus('');
+    }
+
+    function leaveMatch() {
+      sendGoodbye();
+      resetNet(300);
+      isPlaying = false; cancelAnimationFrame(animationId);
+      gameOver();                          // back to the main menu (also saves your coins)
+    }
+
+    // The room is gone: tear everything down, go back to the menu and say why
+    function roomLost(title, reason) {
+      if (!net.active) return;
+      const inGame = isPlaying || net.state === 'results';
+      resetNet();
+      document.getElementById('mp-results').style.display = 'none';
+      if (inGame) { isPlaying = false; cancelAnimationFrame(animationId); gameOver(); }
+      else switchMpView('mp-view-hub');
+      showMpNotice(title, reason);
+    }
+
+    // guest side: the host went away
+    function hostLost(reason) {
+      if (net.active && !net.isHost) roomLost('DISCONNECTED', reason);
+    }
+
+    // SOLO PLAY button: leave the room first if we're in one
+    function startSolo() {
+      if (net.busy) return;                                          // still connecting to a room, wait for it
+      if (!net.active) { startRound(); return; }
+      modalTitle.textContent = "LEAVE ROOM?";
+      modalDesc.textContent = "You're in a multiplayer room. Leave it to play solo?";
+      modalTextarea.style.display = "none";
+      modalActionBtn.textContent = "LEAVE & PLAY SOLO";
+      modalActionBtn.style.backgroundColor = "var(--primary)";
+      modalActionBtn.onclick = () => { closeModal(); sendGoodbye(); resetNet(300); closeMultiplayerUI(); startRound(); };
+      customModal.style.display = 'flex';
+    }
+
+    window.addEventListener('beforeunload', () => {
+      try { sendGoodbye(); } catch (e) {}
+      try { if (net.peer) net.peer.destroy(); } catch (e) {}
+    });
+
+    // ---------- HOST: create a room ----------
+    function randomRoomCode() {
+      let s = '';
+      for (let i = 0; i < 4; i++) s += ROOM_CODE_CHARS[Math.floor(Math.random() * ROOM_CODE_CHARS.length)];
+      return s;
+    }
+
+    async function generateRoom() {
+      if (net.busy) return;
+      const nick = cleanName(document.getElementById("host-nickname").value, "Player1");
+      const max = clamp(parseInt(document.getElementById("room-max-players").value, 10) || 4, 2, 5);
+
+      net.busy = true;
+      mpSetStatus('Creating room…');
+      try { await loadPeerLib(); }
+      catch (e) {
+        net.busy = false;
+        mpSetStatus("Couldn't load the networking library. Check your internet connection and try again.", 'error');
+        return;
+      }
+      resetNet();
+      hostCreate(nick, max, 0);
+    }
+
+    function hostCreate(nick, max, attempt) {
+      const code = randomRoomCode();
+      let peer, timer, done = false, opened = false;
+      const fail = (msg) => {
+        if (done) return;
+        done = true; clearTimeout(timer);
+        try { peer && peer.destroy(); } catch (e) {}
+        net.busy = false;
+        mpSetStatus(msg, 'error');
+      };
+
+      try { peer = new (getPeerCtor())(MP_PEER_PREFIX + code, { debug: 1 }); }
+      catch (e) { fail("Couldn't start networking in this browser."); return; }
+      timer = setTimeout(() => { if (!opened) fail("Couldn't reach the matchmaking server. Check your connection and try again."); }, 12000);
+
+      peer.on('open', () => {
+        if (done) return;
+        opened = true; clearTimeout(timer);
+        net.busy = false;
+        net.peer = peer; net.hostConn = null;
+        net.active = true; net.isHost = true; net.state = 'lobby';
+        net.code = code; net.max = max; net.myId = 0; net.name = nick;
+        net.roster = { 0: newRosterEntry(0, nick, true, null) };
+        renderLobbyList();
+        switchMpView('mp-view-lobby');
+        mpSetStatus('');
+      });
+
+      peer.on('connection', hostOnConnection);
+
+      // PeerJS errors are usually fatal and destroy the peer. If that happens the room is dead, so close it cleanly.
+      peer.on('close', () => {
+        if (net.peer === peer && net.isHost) roomLost('ROOM CLOSED', 'The connection to the matchmaking server was lost, so the room had to close.');
+      });
+
+      // lost the matchmaking server: players already connected are fine, but try to get it back so new people can join
+      peer.on('disconnected', () => {
+        if (net.peer === peer && !peer.destroyed) { try { peer.reconnect(); } catch (e) {} }
+      });
+
+      peer.on('error', (err) => {
+        if (opened) { console.warn('Peer error:', err); return; }
+        if (err && err.type === 'unavailable-id' && attempt < 6) {        // that code is taken, roll another one
+          done = true; clearTimeout(timer);
+          try { peer.destroy(); } catch (e) {}
+          hostCreate(nick, max, attempt + 1);
+          return;
+        }
+        fail("Couldn't reach the matchmaking server. Check your connection and try again.");
+      });
+    }
+
+    // A guest connected to our room. It becomes a player once it sends "join".
+    function hostOnConnection(conn) {
+      let slot = -1;
+      conn.on('data', (msg) => {
+        try {
+          if (!msg || typeof msg !== 'object') return;
+          if (msg.t === 'join') { if (slot < 0) slot = hostAddGuest(conn, msg); return; }
+          if (slot >= 0) hostOnGuestMessage(slot, msg, conn);
+        } catch (e) { console.error('Bad message from a guest', e); }
+      });
+      conn.on('close', () => { if (slot >= 0) hostRemoveGuest(slot, conn); });
+      conn.on('error', (e) => console.warn('Connection error', e));
+    }
+
+    function lobbyMessage() {
+      return { t: 'lobby', code: net.code, max: net.max, mode: net.mode, players: rosterList().map(r => ({ id: r.id, name: r.name, isHost: r.isHost })) };
+    }
+
+    function hostBroadcastLobby() {
+      const m = lobbyMessage();
+      rosterList().forEach(r => r.conn && netSend(r.conn, m));
+      renderLobbyList();
+    }
+
+    function hostAddGuest(conn, msg) {
+      const refuse = (reason) => {
+        netSend(conn, { t: 'reject', reason });
+        setTimeout(() => { try { conn.close(); } catch (e) {} }, 400);
+        return -1;
+      };
+      if (msg.v !== MP_PROTOCOL) return refuse('Your game version does not match the host. Reload the page and try again.');
+      if (net.state === 'playing') return refuse('That match has already started.');
+      if (rosterList().length >= net.max) return refuse('That room is full.');
+
+      let id = 1;
+      while (net.roster[id]) id++;
+      const base = cleanName(msg.name, 'Guest');
+      let name = base;
+      const taken = new Set(rosterList().map(r => r.name.toLowerCase()));
+      for (let n = 2; taken.has(name.toLowerCase()) && n < 20; n++) name = base.slice(0, 10) + ' ' + n;
+
+      net.roster[id] = newRosterEntry(id, name, false, conn);
+      netSend(conn, Object.assign(lobbyMessage(), { t: 'welcome', id }));
+      hostBroadcastLobby();
+      return id;
+    }
+
+    function hostRemoveGuest(id, conn) {
+      const r = net.roster[id];
+      if (!r || (conn && r.conn !== conn)) return;
+      if (net.state === 'playing') {
+        // keep them in the roster so they still show up in the results
+        r.left = true; r.conn = null;
+        if (r.alive) { r.alive = false; r.deathTick = frameCount; }
+        emitGlobal(['left', id]);
+        updateMpPanel();
+        hostCheckMatchEnd();
+      } else {
+        delete net.roster[id];
+        hostBroadcastLobby();
+      }
+    }
+
+    // ---------- GUEST: join a room ----------
+    async function attemptJoinRoom() {
+      if (net.busy) return;
+      const nick = cleanName(document.getElementById("join-nickname").value, "GuestGamer");
+      const code = document.getElementById("join-room-code").value.trim().toUpperCase();
+
+      if (!/^[A-Z0-9]{4}$/.test(code)) {
+        mpSetStatus('Enter the 4-character room code.', 'error');
+        return;
+      }
+
+      net.busy = true;
+      mpSetStatus('Connecting…');
+      try { await loadPeerLib(); }
+      catch (e) {
+        net.busy = false;
+        mpSetStatus("Couldn't load the networking library. Check your internet connection and try again.", 'error');
+        return;
+      }
+      resetNet();
+
+      let peer, conn, timer, done = false, welcomed = false;
+      const fail = (msg) => {
+        if (done) return;
+        done = true; clearTimeout(timer);
+        try { peer && peer.destroy(); } catch (e) {}
+        net.busy = false;
+        mpSetStatus(msg, 'error');
+      };
+
+      try { peer = new (getPeerCtor())({ debug: 1 }); }
+      catch (e) { fail("Couldn't start networking in this browser."); return; }
+      timer = setTimeout(() => { if (!welcomed) fail("Couldn't connect to that room. Check the code, or ask the host to make a new one."); }, 15000);
+
+      peer.on('open', () => {
+        if (done) return;
+        conn = peer.connect(MP_PEER_PREFIX + code, { reliable: true, serialization: 'json' });
+
+        conn.on('open', () => netSend(conn, { t: 'join', name: nick, v: MP_PROTOCOL }));
+
+        conn.on('data', (msg) => {
+          try {
+            if (!msg || typeof msg !== 'object' || done) return;
+            if (!welcomed) {
+              if (msg.t === 'welcome') {
+                welcomed = true; clearTimeout(timer);
+                net.busy = false;
+                net.peer = peer; net.hostConn = conn;
+                net.active = true; net.isHost = false; net.state = 'lobby';
+                net.code = code; net.myId = msg.id; net.name = nick; net.roster = {};
+                syncLobby(msg);
+                switchMpView('mp-view-lobby');
+                mpSetStatus('');
+              } else if (msg.t === 'reject') {
+                fail(msg.reason || 'The host refused the connection.');
+              }
+              return;
+            }
+            guestOnMessage(msg);
+          } catch (e) { console.error('Bad message from the host', e); }
+        });
+
+        conn.on('close', () => {
+          if (!welcomed) fail("Couldn't connect to that room. Check the code, or ask the host to make a new one.");
+          else if (net.hostConn === conn) hostLost('Lost connection to the host.');
+        });
+      });
+
+      peer.on('close', () => { if (welcomed && net.peer === peer) hostLost('Lost connection to the host.'); });
+
+      peer.on('error', (err) => {
+        if (welcomed) { console.warn('Peer error:', err); return; }
+        if (err && err.type === 'peer-unavailable') fail('Room not found. Check the code and try again.');
+        else fail("Couldn't reach the matchmaking server. Check your connection and try again.");
+      });
+    }
+
+    function syncRosterFromList(players) {
+      const next = {};
+      (players || []).forEach(p => {
+        const prev = net.roster[p.id];
+        if (prev) { prev.name = p.name; prev.isHost = !!p.isHost; next[p.id] = prev; }
+        else next[p.id] = newRosterEntry(p.id, p.name, !!p.isHost, null);
+      });
+      net.roster = next;
+    }
+
+    function syncLobby(msg) {
+      if (typeof msg.max === 'number') net.max = msg.max;
+      if (msg.mode === 'coop' || msg.mode === 'last') net.mode = msg.mode;
+      syncRosterFromList(msg.players);
+      renderLobbyList();
+    }
+
+    function guestOnMessage(msg) {
+      switch (msg.t) {
+        case 'lobby':  syncLobby(msg); break;
+        case 'start':  syncRosterFromList(msg.players); net.mode = msg.mode === 'last' ? 'last' : 'coop'; beginMatch(num(msg.seed, 1)); break;
+        case 'snap':   if (net.state === 'playing') guestApplySnapshot(msg); break;
+        case 'end':    if (net.state === 'playing') finishMatchLocally(msg.res || { mode: net.mode, wave: 1, ticks: 0, players: [] }); break;
+        case 'closed': hostLost(msg.reason || 'The host closed the room.'); break;
+      }
+    }
+
+    // ---------- starting a match ----------
+    function startMultiplayerMatch() {
+      if (!net.active || !net.isHost || net.state === 'playing') return;
+      const seed = (Math.random() * 4294967296) >>> 0;       // same seed everywhere = same map
+      const players = rosterList().map(r => ({ id: r.id, name: r.name, isHost: r.isHost }));
+      rosterList().forEach(r => r.conn && netSend(r.conn, { t: 'start', seed, players, mode: net.mode }));
+      beginMatch(seed);
+    }
+
+    function beginMatch(seed) {
+      net.state = 'playing';
+      net.startCount = rosterList().length;
+      net.outShots = []; net.outHits = []; net.outPlace = []; net.hostShots = [];
+      net.outPick = []; net.outHaunt = false; net.hostEvents = [];
+      net.localDead.clear();
+      net.spectateId = -1;
+      net.lastSnapAt = Date.now();
+      document.getElementById('mp-results').style.display = 'none';
+      closeMultiplayerUI();
+      ensureTickWorker();
+      startRound({ seed });
+    }
+
+    // called from startRound() once the local Player exists
+    function setupMatchWorld() {
+      const list = rosterList();
+      list.forEach((r, i) => {
+        const ang = (i / list.length) * Math.PI * 2;       // everyone starts in a small circle
+        const rad = list.length > 1 ? 80 : 0;
+        r.x = r.dx = Math.cos(ang) * rad;
+        r.y = r.dy = Math.sin(ang) * rad;
+        r.cx = r.x; r.cy = r.y;
+        r.a = r.da = 0; r.g = 0; r.rl = 0; r.hl = 0; r.sh = 0;
+        r.hp = r.mhp = 100;
+        r.alive = true; r.left = false; r.deathTick = 0; r.evq = []; r.lastRx = Date.now();
+        r.downed = false; r.rv = 0; r.dt = 0; r.bf = 0; r.life = 0; r.respawnAt = 0; r.haunt = 1;
+        r.kills = 0; r.dmg = 0; r.rev = 0; r.deaths = 0; r.boss = 0;
+      });
+      const me = net.roster[net.myId];
+      player.x = me.x; player.y = me.y;
+      player.color = colorOf(net.myId);
+      player.name = net.name;
+      me.hp = player.hp; me.mhp = player.stats.maxHp;
+      net.view.x = player.x; net.view.y = player.y;
+      mpHideMatchUi();
+      dirReset();
+      if (net.isHost) startWave(1);
+      updateMpPanel();
+    }
+
+    // ---------- shots, hits, placing defenses ----------
+    function bulletMode() { return (net.active && !net.isHost) ? 'report' : 'direct'; }
+
+    // Mine: record a shot so the other players can see the bullets
+    function netRecordShot(x, y, color, pierce, angles) {
+      const a = angles.map(rnd3);
+      if (net.isHost) net.hostShots.push([0, net.myId, Math.round(x), Math.round(y), color, pierce, a]);
+      else net.outShots.push([Math.round(x), Math.round(y), color, pierce, a]);
+    }
+
+    // Host: a turret / bodyguard fired (guests only get a picture of the bullet)
+    function defenseShot(d, angle, color) {
+      if (net.active && net.isHost) net.hostShots.push([1, d.owner, Math.round(d.x), Math.round(d.y), color, 1, [rnd3(angle)]]);
+    }
+
+    // A bullet fired by somebody else: draw it flying, it never deals damage here
+    function spawnVisualShot(owner, x, y, color, pierce, angles) {
+      if (typeof color !== 'string') color = '#ffffff';
+      angles.forEach(a => bullets.push(new Bullet(x, y, a, 0, pierce, color, 'visual', owner)));
+      if (angles.length) particles.push(new Particle(x + Math.cos(angles[0]) * 18, y + Math.sin(angles[0]) * 18, color, 2, 4));
+    }
+
+    // Host: damage a guest says it dealt (the host owns the real zombies)
+    function applyReportedHits(owner, hits) {
+      for (const h of hits) {
+        if (!Array.isArray(h)) continue;
+        const z = zombieMap.get(h[0]);
+        if (!z) continue;                                   // already dead
+        const d = clamp(num(h[1], 0), 0, 1000);
+        z.hp -= d;
+        const ro = net.roster[owner]; if (ro) ro.dmg += d;
+        if (z.hp <= 0) { removeZombieAt(zombies.indexOf(z)); rewardKill(z, owner); }
+      }
+    }
+
+    function placeDefense(kind) {
+      const turret = kind === 'turret';
+      const x = player.x + (turret ? 0 : 20), y = player.y + (turret ? 0 : 20);
+      if (net.active && !net.isHost) { net.outPlace.push([turret ? 't' : 'b', Math.round(x), Math.round(y)]); return; }
+      const d = turret ? new Turret(x, y) : new Bodyguard(x, y);
+      d.owner = net.myId;
+      defenses.push(d);
+    }
+
+    function hostPlaceDefense(owner, p) {
+      if (!Array.isArray(p) || defenses.length >= 60) return;
+      const x = num(p[1], 0), y = num(p[2], 0);
+      const d = p[0] === 'b' ? new Bodyguard(x, y) : new Turret(x, y);
+      d.owner = owner;
+      defenses.push(d);
+    }
+
+    // who a bodyguard follows: its owner, or whoever is still alive if the owner is gone
+    function leaderFor(ownerId) {
+      if (!net.active) return player;
+      if (ownerId === net.myId) return player.dead ? (aiTargets[0] || null) : player;
+      const r = net.roster[ownerId];
+      return (r && r.alive && !r.left) ? r : (aiTargets[0] || null);
+    }
+
+    // guests: turrets / bodyguards are simulated by the host, we only smooth their movement
+    function netSmoothDefense(d) {
+      d.x += (d.tx - d.x) * 0.35;
+      d.y += (d.ty - d.y) * 0.35;
+    }
+
+    // ---------- the network tick (every NET_EVERY game ticks) ----------
+    function syncSelfEntry() {
+      const me = net.roster[net.myId];
+      if (!me || !player) return;
+      me.x = player.x; me.y = player.y; me.a = player.aim;
+      me.hp = Math.max(0, player.hp); me.mhp = player.stats.maxHp; me.sh = Math.max(0, player.shieldHp);
+      me.g = Math.max(0, gunKeys().indexOf(equippedGun));
+      me.rl = player.isReloading ? 1 : 0; me.hl = player.isHealing ? 1 : 0;
+      me.downed = !!player.downed; me.rv = Math.round(player.reviveProgress * 100); me.dt = Math.ceil(player.downTimer / 60);
+      me.bf = (player.buffDmg > 0 ? 1 : 0) | (player.buffSpd > 0 ? 2 : 0);
+    }
+
+    function netTick() {
+      syncSelfEntry();
+      if (net.isHost) hostNetTick(); else guestNetTick();
+    }
+
+    // Host: read what a guest sent us
+    function hostOnGuestMessage(id, msg, conn) {
+      const r = net.roster[id];
+      if (!r || r.conn !== conn) return;
+      r.lastRx = Date.now();
+
+      if (msg.t === 'leave') { hostRemoveGuest(id, conn); return; }
+      if (msg.t !== 'u' || net.state !== 'playing') return;
+
+      const s = msg.s || {};
+      r.x = num(s.x, r.x); r.y = num(s.y, r.y); r.a = num(s.a, r.a);
+      r.hp = num(s.hp, r.hp); r.mhp = Math.max(1, num(s.mhp, r.mhp)); r.sh = num(s.sh, 0);
+      r.g = clamp(num(s.g, 0) | 0, 0, gunKeys().length - 1);
+      r.rl = s.rl ? 1 : 0; r.hl = s.hl ? 1 : 0;
+      r.vw = clamp(num(s.vw, 1280), 320, 4000); r.vh = clamp(num(s.vh, 720), 240, 3000);
+      r.cx = num(s.cx, r.x); r.cy = num(s.cy, r.y);
+
+      if (Array.isArray(msg.sh)) {
+        for (const sh of msg.sh) {
+          if (!Array.isArray(sh) || !Array.isArray(sh[4])) continue;
+          const x = num(sh[0], r.x), y = num(sh[1], r.y);
+          const color = typeof sh[2] === 'string' ? sh[2].slice(0, 9) : '#ffffff';
+          const pierce = clamp(num(sh[3], 1) | 0, 1, 8);
+          const angles = sh[4].slice(0, 8).map(a => num(a, 0));
+          spawnVisualShot(id, x, y, color, pierce, angles);
+          net.hostShots.push([0, id, Math.round(x), Math.round(y), color, pierce, angles]);      // pass it on to the other guests
+        }
+      }
+      if (Array.isArray(msg.h)) applyReportedHits(id, msg.h);
+      if (Array.isArray(msg.pl)) msg.pl.forEach(p => hostPlaceDefense(id, p));
+      if (Array.isArray(msg.pk)) msg.pk.slice(0, 6).forEach(pid => hostCollectPickup(id, pid));
+      if (msg.hz && net.mode === 'last' && !r.alive && r.haunt >= 1) { r.haunt -= 1; spawnHaunt(id, r.cx, r.cy); }
+
+      // alive / downed / dead. Packets sent before their last respawn are stale, ignore those.
+      const lf = num(s.lf, 0);
+      if (lf >= r.life) {
+        const wasDown = !!r.downed;
+        r.downed = !!s.dn; r.rv = clamp(num(s.rv, 0), 0, 100) | 0; r.dt = clamp(num(s.dt, 0), 0, 99) | 0; r.bf = num(s.bf, 0) | 0;
+        if (!s.al && r.alive) hostPlayerDied(r);
+        else if (r.alive && s.dn && !wasDown) emitGlobal(['dn', id]);
+        else if (r.alive && !s.dn && wasDown) hostCreditRevive(r);
+      }
+    }
+
+    // Host: send every guest a snapshot of the world
+    function hostNetTick() {
+      const now = Date.now();
+      for (const r of rosterList()) {                         // drop guests that went silent (closed or frozen tab)
+        if (r.isHost || r.left || !r.conn) continue;
+        if (now - r.lastRx > 20000) { const c = r.conn; hostRemoveGuest(r.id, c); try { c.close(); } catch (e) {} }
+      }
+      if (net.state !== 'playing') return;
+
+      // ghosts (last standing) slowly earn the right to send another zombie
+      if (net.mode === 'last') rosterList().forEach(r => { if (!r.alive) r.haunt = Math.min(3, r.haunt + 1 / 200); });
+
+      net.bosses = bossList();                                  // the host's own copy of what guests get as "bs"
+      net.waveLeft = Math.max(0, Math.ceil((WAVE_TICKS - (frameCount - director.waveStart)) / 60));
+      updateBossBar();
+
+      const people = rosterList().map(r => [
+        r.id, Math.round(r.x), Math.round(r.y), rnd3(r.a), Math.ceil(Math.max(0, r.hp)), Math.round(r.mhp),
+        Math.ceil(Math.max(0, r.sh)), r.g,
+        (r.alive ? 1 : 0) | (r.rl ? 2 : 0) | (r.hl ? 4 : 0) | (r.left ? 8 : 0) | (r.downed ? 16 : 0) | ((r.bf & 1) ? 32 : 0) | ((r.bf & 2) ? 64 : 0),
+        Math.round(r.rv || 0), Math.round(r.dt || 0)
+      ]);
+      const defs = defenses.map(d => [d.id, d.kind === 'turret' ? 0 : 1, Math.round(d.x), Math.round(d.y), Math.ceil(Math.max(0, d.hp)), d.owner]);
+      const pu = pickups.map(p => [p.id, PICKUP_TYPES.indexOf(p.type), Math.round(p.x), Math.round(p.y), Math.round(p.ttl)]);
+      const world = [director.wave, director.moon ? 1 : 0, net.waveLeft];
+
+      for (const r of rosterList()) {
+        if (r.isHost || r.left || !r.conn) continue;
+        if ((r.conn.bufferSize || 0) > 2) continue;        // this guest's connection is backed up: skip a snapshot so their lag doesn't snowball
+        // only send the zombies this guest can actually see (plus a margin)
+        const halfW = r.vw / 2 + 160, halfH = r.vh / 2 + 160;
+        const zs = [];
+        for (let i = 0; i < zombies.length; i++) {
+          const z = zombies[i];
+          if (Math.abs(z.x - r.cx) <= halfW && Math.abs(z.y - r.cy) <= halfH) {
+            zs.push([z.id, Math.round(z.x), Math.round(z.y), Math.ceil(z.hp), Math.round(z.maxHp), z.typeIdx]);
+          }
+        }
+        const msg = { t: 'snap', p: people, z: zs, d: defs, g: world, bs: net.bosses, pu };
+        const shots = net.hostShots.filter(s => !(s[0] === 0 && s[1] === r.id));       // they already drew their own bullets
+        if (shots.length) msg.sh = shots;
+        if (net.hostEvents.length) msg.eg = net.hostEvents;
+        if (r.evq.length) { msg.ev = r.evq; r.evq = []; }
+        netSend(r.conn, msg);
+      }
+      net.hostShots = []; net.hostEvents = [];
+      hostCheckMatchEnd();
+    }
+
+    // Guest: tell the host what I'm doing
+    function guestNetTick() {
+      if (Date.now() - net.lastSnapAt > 15000) { hostLost('Lost connection to the host.'); return; }
+      guestSend();
+    }
+
+    function guestSend() {
+      if (!net.hostConn || !net.hostConn.open) return;
+      const vt = viewTarget();
+      const msg = {
+        t: 'u',
+        s: {
+          x: rnd1(player.x), y: rnd1(player.y), a: rnd3(player.aim),
+          hp: rnd1(Math.max(0, player.hp)), mhp: player.stats.maxHp, sh: rnd1(Math.max(0, player.shieldHp)),
+          g: Math.max(0, gunKeys().indexOf(equippedGun)), rl: player.isReloading ? 1 : 0, hl: player.isHealing ? 1 : 0,
+          al: player.dead ? 0 : 1, vw: canvas.width, vh: canvas.height, cx: Math.round(vt.x), cy: Math.round(vt.y),
+          dn: player.downed ? 1 : 0, rv: Math.round(player.reviveProgress * 100), dt: Math.ceil(player.downTimer / 60),
+          lf: player.life, bf: (player.buffDmg > 0 ? 1 : 0) | (player.buffSpd > 0 ? 2 : 0)
+        }
+      };
+      if (net.outShots.length) msg.sh = net.outShots;
+      if (net.outHits.length) msg.h = net.outHits;
+      if (net.outPlace.length) msg.pl = net.outPlace;
+      if (net.outPick.length) msg.pk = net.outPick;
+      if (net.outHaunt) msg.hz = 1;
+      net.outShots = []; net.outHits = []; net.outPlace = []; net.outPick = []; net.outHaunt = false;
+      netSend(net.hostConn, msg);
+    }
+
+    // Guest: apply a world snapshot from the host
+    function guestApplySnapshot(msg) {
+      net.lastSnapAt = Date.now();
+
+      if (Array.isArray(msg.p)) {
+        for (const e of msg.p) {
+          const r = net.roster[e[0]];
+          if (!r || r.id === net.myId) continue;
+          r.x = e[1]; r.y = e[2]; r.a = e[3]; r.hp = e[4]; r.mhp = e[5]; r.sh = e[6]; r.g = e[7];
+          const f = e[8];
+          r.alive = !!(f & 1); r.rl = (f & 2) ? 1 : 0; r.hl = (f & 4) ? 1 : 0; r.left = !!(f & 8);
+          r.downed = !!(f & 16); r.bf = ((f & 32) ? 1 : 0) | ((f & 64) ? 2 : 0); r.rv = e[9] | 0; r.dt = e[10] | 0;
+        }
+      }
+      if (Array.isArray(msg.g)) { net.wave = msg.g[0]; net.moon = !!msg.g[1]; net.waveLeft = msg.g[2]; }
+      if (Array.isArray(msg.bs)) { net.bosses = msg.bs; updateBossBar(); }
+      if (Array.isArray(msg.z)) applyZombieSnapshot(msg.z);
+      if (Array.isArray(msg.d)) applyDefenseSnapshot(msg.d);
+      if (Array.isArray(msg.pu)) applyPickupSnapshot(msg.pu);
+      if (Array.isArray(msg.eg)) msg.eg.forEach(ev => handleGlobalEvent(ev));
+
+      if (Array.isArray(msg.sh)) {
+        for (const s of msg.sh) {
+          // [kind, owner, x, y, color, pierce, angles]   kind 0 = a player's gun, 1 = a turret / bodyguard
+          if (!Array.isArray(s) || !Array.isArray(s[6])) continue;
+          spawnVisualShot(s[1], s[2], s[3], s[4], s[5], s[6]);
+          if (s[0] === 1 && s[1] === net.myId) SFX.turretShoot();
+        }
+      }
+      if (Array.isArray(msg.ev)) {                                              // things that are just for me
+        for (const ev of msg.ev) {
+          if (ev[0] === 'k') { coins += num(ev[1], 0); updateHUD(); }           // coins (a kill, a wave bonus, ...)
+          else if (ev[0] === 'pu') applyPowerup(PICKUP_TYPES[ev[1]] || 'coins');
+          else if (ev[0] === 'rs') respawnLocal(num(ev[1], 0), num(ev[2], 0), num(ev[3], 0));
+        }
+      }
+    }
+
+    function applyZombieSnapshot(list) {
+      const seen = new Set();
+      const now = Date.now();
+      for (let k = 0; k < list.length; k++) {
+        const e = list[k], id = e[0];
+        seen.add(id);
+        const killedAt = net.localDead.get(id);
+        if (killedAt !== undefined) {                       // I already killed this one, wait for the host to catch up
+          if (now - killedAt < 1500) continue;
+          net.localDead.delete(id);
+        }
+        const z = zombieMap.get(id);
+        if (!z) addZombie(Zombie.fromNet(id, e[1], e[2], e[3], e[4], e[5]));
+        else { z.netTarget(e[1], e[2]); if (e[3] < z.hp) z.hp = e[3]; }      // health can only go down
+      }
+      for (let i = zombies.length - 1; i >= 0; i--) if (!seen.has(zombies[i].id)) removeZombieAt(i);
+      for (const id of net.localDead.keys()) if (!seen.has(id)) net.localDead.delete(id);
+    }
+
+    function applyDefenseSnapshot(list) {
+      const byId = new Map(defenses.map(d => [d.id, d]));
+      const next = [];
+      for (const e of list) {
+        let d = byId.get(e[0]);
+        if (!d) { d = e[1] === 0 ? new Turret(e[2], e[3]) : new Bodyguard(e[2], e[3]); d.id = e[0]; d.remote = true; }
+        d.tx = e[2]; d.ty = e[3]; d.hp = e[4]; d.owner = e[5];
+        next.push(d);
+      }
+      defenses = next;
+    }
+
+    // smooth the other players' movement between network updates
+    function updateRemotes() {
+      for (const r of rosterList()) {
+        if (r.id === net.myId || r.left) continue;
+        r.dx += (r.x - r.dx) * 0.35;
+        r.dy += (r.y - r.dy) * 0.35;
+        const da = Math.atan2(Math.sin(r.a - r.da), Math.cos(r.a - r.da));
+        r.da += da * 0.4;
+      }
+    }
+
+    function drawNameTag(name, x, y, color) {
+      ctx.save();
+      ctx.font = "bold 12px 'Montserrat'"; ctx.textAlign = "center";
+      ctx.lineWidth = 3; ctx.strokeStyle = "rgba(0,0,0,0.7)"; ctx.strokeText(name, x, y);
+      ctx.fillStyle = color || "#fff"; ctx.fillText(name, x, y);
+      ctx.restore();
+    }
+
+    function drawRemotePlayers() {
+      for (const r of rosterList()) {
+        if (r.id === net.myId || r.left || !r.alive) continue;
+        const x = r.dx, y = r.dy, col = colorOf(r.id);
+        const gun = defaultGuns[gunKeys()[r.g]] || defaultGuns.pistol;
+        if (r.downed) { drawDownedPlayer(x, y, col, r.name, r.rv / 100, r.dt / (DOWN_TICKS / 60)); continue; }
+
+        if (r.sh > 0) {
+          ctx.beginPath(); ctx.arc(x, y, 18 + 6, 0, Math.PI * 2);
+          ctx.strokeStyle = `rgba(56, 189, 248, ${0.4 + 0.6 * Math.min(1, r.sh / 50)})`;
+          ctx.lineWidth = 4; ctx.stroke();
+        }
+        ctx.beginPath(); ctx.arc(x, y, 18, 0, Math.PI * 2);
+        ctx.fillStyle = col; ctx.fill(); ctx.strokeStyle = "#fff"; ctx.lineWidth = 3; ctx.stroke();
+
+        ctx.beginPath(); ctx.moveTo(x, y);
+        ctx.lineTo(x + Math.cos(r.da) * 30, y + Math.sin(r.da) * 30);
+        ctx.strokeStyle = gun.color; ctx.lineWidth = 8; ctx.lineCap = "round"; ctx.stroke();
+
+        if (r.rl) {
+          ctx.beginPath(); ctx.arc(x, y, 18 + 15, 0, Math.PI * 2);
+          ctx.strokeStyle = "rgba(251, 191, 36, 0.6)"; ctx.lineWidth = 3; ctx.stroke();
+        }
+
+        drawBuffRings(x, y, r.bf & 1, r.bf & 2);
+
+        ctx.fillStyle = "rgba(0,0,0,0.8)"; ctx.fillRect(x - 18, y - 33, 36, 5);
+        ctx.fillStyle = "#10b981"; ctx.fillRect(x - 18, y - 33, 36 * clamp(r.hp / Math.max(1, r.mhp), 0, 1), 5);
+        drawNameTag(r.name, x, y - 40, col);
+      }
+    }
+
+    // ---------- dying, spectating, ending the match ----------
+    function onLocalDeathMp() {
+      player.dead = true; player.downed = false;
+      player.isReloading = false; player.isHealing = false; player.shieldHp = 0;
+      reloadWarning.style.display = "none";
+      hpContainer.classList.remove('low-health');
+      player.respawnAt = frameCount + RESPAWN_TICKS;
+      const me = net.roster[net.myId];
+      if (me) { me.hp = 0; me.downed = false; }
+      cycleSpectate();
+      if (net.isHost && me) hostPlayerDied(me);                      // marks me dead, announces it, checks whether the match is over
+      updateMpBanner(); updateMpPanel();
+      if (!net.isHost) guestSend();                                  // tell the host right away
+    }
+
+    function aliveRemoteIds() {
+      return rosterList().filter(r => r.id !== net.myId && r.alive && !r.left).map(r => r.id);
+    }
+
+    function cycleSpectate() {
+      const ids = aliveRemoteIds();
+      if (!ids.length) { net.spectateId = -1; updateMpBanner(); return; }
+      const i = ids.indexOf(net.spectateId);
+      net.spectateId = ids[(i + 1) % ids.length];
+      updateMpBanner();
+    }
+
+    // what the camera follows: me, or the player I'm spectating after dying
+    function viewTarget() {
+      if (!(net.active && net.state === 'playing' && player && player.dead)) {
+        if (player) { net.view.x = player.x; net.view.y = player.y; }
+        return player;
+      }
+      let r = net.roster[net.spectateId];
+      if ((!r || !r.alive || r.left) && aliveRemoteIds().length) { cycleSpectate(); r = net.roster[net.spectateId]; }
+      if (r && r.alive && !r.left) { net.view.x = r.dx; net.view.y = r.dy; }
+      return net.view;
+    }
+
+    function computeResults() {
+      const players = rosterList().map(r => {
+        const alive = r.alive && !r.left;
+        return { id: r.id, name: r.name, alive, left: !!r.left, ticks: alive ? frameCount : r.deathTick,
+                 kills: r.kills | 0, dmg: Math.round(r.dmg || 0), rev: r.rev | 0, deaths: r.deaths | 0, boss: r.boss | 0 };
+      });
+      if (net.mode === 'last') players.sort((a, b) => (b.alive - a.alive) || (b.ticks - a.ticks) || (a.id - b.id));
+      else players.sort((a, b) => (matchScore(b) - matchScore(a)) || (a.id - b.id));
+      return { mode: net.mode, wave: director.wave, ticks: frameCount, players };
+    }
+
+    // Host: is the match over?
+    function hostCheckMatchEnd() {
+      if (!net.isHost || net.state !== 'playing') return;
+      const alive = rosterList().filter(r => r.alive && !r.left).length;
+      let over;
+      if (net.mode === 'coop') over = alive === 0;                          // co-op: it ends when the whole team is gone
+      else over = net.startCount >= 2 ? alive <= 1 : alive === 0;          // last standing: last one wins (a solo lobby just ends on death)
+      if (!over) return;
+      const res = computeResults();
+      rosterList().forEach(r => r.conn && netSend(r.conn, { t: 'end', res }));
+      finishMatchLocally(res);
+    }
+
+    function finishMatchLocally(res) {
+      if (net.state === 'results') return;
+      net.state = 'results';
+      if (net.isHost) rosterList().forEach(r => { if (r.left) delete net.roster[r.id]; });   // players who left were only kept for the results list
+      isPlaying = false; cancelAnimationFrame(animationId);
+      const bonus = matchBonus(res);
+      coins += bonus.total;                                 // bonus coins for how the match went
+      const rec = updateMpRecords(res);
+      saveGameData();                                       // keep the coins you earned
+      hud.style.display = 'none'; reloadWarning.style.display = 'none';
+      mpHideMatchUi();
+      showMpResults(res, bonus, rec);
+    }
+
+    function showMpResults(res, bonus, rec) {
+      const players = res.players || [];
+      const multi = players.length > 1;
+      const coop = res.mode === 'coop';
+      const title = document.getElementById('mp-results-title');
+      const sub = document.getElementById('mp-results-sub');
+      const mine = players.find(p => p.id === net.myId);
+      if (coop) {
+        title.textContent = 'OVERRUN!'; title.style.color = 'var(--danger)';
+        sub.textContent = `Your team reached WAVE ${res.wave} · ${fmtTime(res.ticks / 60)}`;
+      } else {
+        const winner = players[0];
+        const iWon = multi && winner && winner.id === net.myId;
+        title.textContent = iWon ? 'YOU WIN!' : 'MATCH OVER';
+        title.style.color = iWon ? 'var(--gold)' : 'var(--text-main)';
+        sub.textContent = multi ? (iWon ? 'You survived the longest.' : `${winner.name} survived the longest.`)
+                                : `You survived ${fmtTime(mine ? mine.ticks / 60 : 0)}.`;
+      }
+
+      const awards = computeAwards(players);
+      let html = '';
+      players.forEach((p, i) => {
+        const tags = (p.id === net.myId ? ' (you)' : '') + (p.left ? ' (left)' : '');
+        const crown = !coop && multi && i === 0;
+        const badges = (awards[p.id] || []).map(a => `<span class="mp-badge">${a}</span>`).join('');
+        const stats = `⚔ ${p.kills} · 💉 ${p.rev} · 💥 ${fmtNum(p.dmg)}` + (coop ? '' : ` · ${fmtTime(p.ticks / 60)}${p.alive && multi ? ' ✔' : ''}`);
+        html += `
+          <div class="mp-player-item${crown ? ' winner' : ''}">
+            <span>${crown ? '👑' : '#' + (i + 1)} <span class="mp-dot" style="background:${colorOf(p.id)}; margin-left:6px;"></span>${esc(p.name)}${tags}${badges}</span>
+            <span class="mp-stats">${stats}</span>
+          </div>`;
+      });
+      document.getElementById('mp-results-list').innerHTML = html;
+      document.getElementById('mp-results-bonus').innerHTML =
+        (bonus && bonus.total ? `+${bonus.total} 🪙 bonus <small>(${esc(bonus.parts.join(' · '))})</small><br>` : '') +
+        (rec ? `<span class="${rec.fresh ? 'fresh' : ''}">${esc(rec.line)}</span>` : '');
+      document.getElementById('mp-results').style.display = 'flex';
+    }
+
+    function mpResultsToLobby() {
+      document.getElementById('mp-results').style.display = 'none';
+      gameOver();                                           // main menu + save
+      if (net.active) {
+        net.state = 'lobby';
+        if (net.isHost) hostBroadcastLobby();
+        openMultiplayerUI();
+      }
+    }
+
+    function mpResultsToMenu() {
+      document.getElementById('mp-results').style.display = 'none';
+      sendGoodbye();
+      resetNet(300);
+      gameOver();
+    }
+
+    // ---------- in-match HUD pieces ----------
+    function mpHideMatchUi() {
+      document.getElementById('mp-menu').style.display = 'none';
+      document.getElementById('mp-banner').style.display = 'none';
+      document.getElementById('mp-panel').style.display = 'none';
+      fxReset();
+    }
+
+    function toggleMatchMenu(force) {
+      const el = document.getElementById('mp-menu');
+      const open = (typeof force === 'boolean') ? force : el.style.display !== 'flex';
+      el.style.display = open ? 'flex' : 'none';
+      document.getElementById('mp-menu-host-note').style.display = (open && net.isHost) ? 'block' : 'none';
+    }
+
+    function updateMpPanel() {
+      const el = document.getElementById('mp-panel');
+      if (!net.active || net.state !== 'playing' || !player) { el.style.display = 'none'; return; }
+      let html = `<div class="mp-panel-time">${net.moon ? '🌑 ' : ''}WAVE ${net.wave} · ${fmtTime(frameCount / 60)}</div>`;
+      rosterList().forEach(r => {
+        const isMe = r.id === net.myId;
+        const dead = isMe ? player.dead : (!r.alive || r.left);
+        const down = !dead && (isMe ? player.downed : r.downed);
+        const hp = isMe ? player.hp : r.hp, mhp = isMe ? player.stats.maxHp : r.mhp;
+        const pct = (dead || down) ? 0 : clamp(hp / Math.max(1, mhp) * 100, 0, 100);
+        html += `
+          <div class="mp-row${dead ? ' dead' : ''}">
+            <div class="mp-row-top">
+              <span class="mp-row-name"><span class="mp-dot" style="background:${colorOf(r.id)}"></span>${esc(r.name)}${isMe ? ' (you)' : ''}</span>
+              <span>${r.left ? 'left' : (dead ? '☠' : (down ? '🩹' : ''))}</span>
+            </div>
+            <div class="mp-row-bar"><div style="width:${pct}%"></div></div>
+          </div>`;
+      });
+      el.innerHTML = html;
+      el.style.display = 'flex';
+      updateMpBanner();                                     // keeps the countdowns in the banner fresh
+    }
+
+    function updateMpBanner() {
+      const el = document.getElementById('mp-banner');
+      if (!net.active || net.state !== 'playing' || !player || !(player.dead || player.downed)) { el.style.display = 'none'; return; }
+      let html;
+      if (player.downed) {
+        html = `🩹 YOU'RE DOWN<small>Stay put: a teammate can revive you by standing next to you · bleeding out in ${Math.ceil(player.downTimer / 60)}s</small>`;
+      } else {
+        const r = net.roster[net.spectateId], others = aliveRemoteIds().length;
+        const watching = r ? ` — watching <span style="color:${colorOf(r.id)}">${esc(r.name)}</span>` : '';
+        const sw = others > 1 ? ' · click to switch player' : '';
+        const hint = net.mode === 'coop'
+          ? `Respawning in ${Math.max(0, Math.ceil((player.respawnAt - frameCount) / 60))}s${sw}`
+          : `SPACE: send a zombie after them (${Math.floor(player.haunt)}/3 ready)${sw}`;
+        html = `☠ YOU DIED${watching}<small>${hint}${net.isHost ? ' · You are the host, so keep this tab open' : ''}</small>`;
+      }
+      el.innerHTML = html;
+      el.style.display = 'block';
+    }
+
+    // =====================================================================
+    //  MULTIPLAYER: THE FUN STUFF
+    //  * Two modes: CO-OP (team survival, revives, respawns) and LAST STANDING (no revives, ghosts can send zombies)
+    //  * The "Director" paces every match: waves, hordes, bosses, blood moons, airdrops
+    //  * Power-up drops (double damage, speed, shield, health, coins, NUKE)
+    //  * Announcer banners, kill feed, boss bar, match stats, awards, bonus coins and personal records
+    //  The HOST decides everything here and tells the guests, same as the zombies.
+    // =====================================================================
+    const WAVE_TICKS = 4200;            // one wave = 70 seconds
+    const DOWN_TICKS = 1500;            // co-op: 25 s to be revived before you bleed out
+    const REVIVE_RANGE = 70;            // stand this close to a downed friend...
+    const REVIVE_TICKS = 150;           // ...for 2.5 seconds to bring them back
+    const RESPAWN_TICKS = 1800;         // co-op: a dead player comes back after 30 s (as long as somebody is still alive)
+    const PICKUP_TICKS = 1500;          // power-ups stay on the ground for 25 s
+    const PICKUP_TYPES = ['health', 'damage', 'speed', 'shield', 'coins', 'nuke', 'crate'];   // (order = what is sent over the network)
+    const PICKUP_INFO = {
+      health: { icon: '💊', color: '#22c55e', name: 'HEALTH' },
+      damage: { icon: '🔥', color: '#f97316', name: 'DOUBLE DAMAGE' },
+      speed:  { icon: '⚡', color: '#facc15', name: 'SPEED BOOST' },
+      shield: { icon: '🛡️', color: '#38bdf8', name: 'SHIELD' },
+      coins:  { icon: '🪙', color: '#fbbf24', name: '+25 COINS' },
+      nuke:   { icon: '☢️', color: '#a3e635', name: 'NUKE' },
+      crate:  { icon: '📦', color: '#22d3ee', name: 'AIRDROP' }
+    };
+    const BOSS_NAMES = ['THE BRUTE', 'THE ABOMINATION', 'THE JUGGERNAUT', 'THE DEVOURER', 'THE OVERLORD'];
+    const MODE_INFO = {
+      coop: { label: '🤝 CO-OP', desc: 'Team up against waves, hordes and bosses. Revive downed friends, and if you fall you respawn after a while. How far can you get together?' },
+      last: { label: '⚔️ LAST STANDING', desc: 'No revives. The last survivor wins, and the dead can send zombies after everyone who is still alive.' }
+    };
+
+    // Director state (the host drives it; set director.enabled = false to turn waves, bosses, drops and events off while testing)
+    const director = { enabled: true, wave: 1, waveStart: 0, warned: false, started: false, horde: false, dropped: false, bosses: 0, lastMinion: 0, moon: false };
+    let pickups = [];                   // power-ups lying around (host owns them, guests mirror them)
+    let pickupIdCounter = 0;
+    const fx = { flash: 0 };            // screen flash (nuke)
+
+    function fmtNum(n) { return n >= 10000 ? Math.round(n / 1000) + 'k' : (n >= 1000 ? (n / 1000).toFixed(1) + 'k' : String(Math.round(n))); }
+    function livingList() { return rosterList().filter(r => r.alive && !r.left); }          // not dead (a downed player still counts)
+    function nm(id) { const r = net.roster[id]; return r ? `<b style="color:${colorOf(r.id)}">${esc(r.name)}</b>` : 'Someone'; }
+
+    // ---------- announcer banners + kill feed ----------
+    const announceQueue = [];
+    let announceBusy = false;
+
+    function announce(text, kind, sub) {
+      announceQueue.push({ text, kind, sub });
+      while (announceQueue.length > 3) announceQueue.shift();
+      if (!announceBusy) nextAnnounce();
+    }
+    function nextAnnounce() {
+      const a = announceQueue.shift();
+      if (!a) { announceBusy = false; return; }
+      announceBusy = true;
+      const box = document.getElementById('mp-announce');
+      const el = document.createElement('div');
+      el.className = 'announce-item ' + (a.kind || '');
+      el.innerHTML = esc(a.text) + (a.sub ? `<small>${esc(a.sub)}</small>` : '');
+      box.appendChild(el);
+      setTimeout(() => el.remove(), 2700);
+      setTimeout(nextAnnounce, 1900);
+    }
+    function feed(html, color) {
+      const box = document.getElementById('mp-feed');
+      const el = document.createElement('div');
+      el.className = 'feed-line';
+      el.style.borderLeftColor = color || 'var(--secondary)';
+      el.innerHTML = html;
+      box.appendChild(el);
+      while (box.children.length > 6) box.removeChild(box.firstChild);
+      setTimeout(() => el.remove(), 7000);
+    }
+    function fxReset() {
+      announceQueue.length = 0; announceBusy = false;
+      ['mp-announce', 'mp-feed'].forEach(id => { const el = document.getElementById(id); if (el) el.innerHTML = ''; });
+      document.getElementById('mp-bossbar').style.display = 'none';
+      document.getElementById('hud-buffs').style.display = 'none';
+      fx.flash = 0;
+    }
+
+    // ---------- events the host broadcasts to everybody ----------
+    function emitGlobal(ev) {
+      if (!net.isHost) return;
+      net.hostEvents.push(ev);
+      handleGlobalEvent(ev);                 // the host sees it too
+    }
+
+    function handleGlobalEvent(ev) {
+      switch (ev[0]) {
+        case 'wave':
+          net.wave = ev[1]; net.moon = !!ev[2];
+          announce(`WAVE ${ev[1]}`, ev[2] ? 'moon' : 'wave', ev[2] ? 'BLOOD MOON: faster zombies, double coins' : (ev[1] > 1 ? 'Bonus coins for everyone still standing' : 'Survive!'));
+          SFX.wave(); break;
+        case 'warn':
+          announce(ev[1] ? 'BOSS APPROACHING…' : 'HORDE INCOMING!', 'warn', 'Get ready'); SFX.siren(); break;
+        case 'boss': {
+          const n = BOSS_NAMES[ev[1] % BOSS_NAMES.length];
+          announce(`⚠ ${n}`, 'boss', 'Focus fire!'); feed(`⚠ <b>${n}</b> has arrived`, '#ef4444'); SFX.boss(); break;
+        }
+        case 'bossdead':
+          announce('BOSS DEFEATED!', 'win', 'Everyone alive gets a bonus'); feed(`${nm(ev[1])} landed the final blow on the boss`, '#22c55e'); break;
+        case 'drop':
+          announce('AIRDROP INBOUND', 'drop', 'Follow the arrow'); break;
+        case 'nuke':
+          fx.flash = 24; SFX.nuke(); feed(`${nm(ev[3])} set off a ☢️ NUKE`, '#a3e635'); break;
+        case 'pk':
+          feed(`${nm(ev[1])} opened the 📦 airdrop`, '#22d3ee'); break;
+        case 'dn':
+          feed(`${nm(ev[1])} is down!`, '#ef4444'); break;
+        case 'rv':
+          feed(`${nm(ev[1])} revived ${nm(ev[2])}`, '#22c55e'); SFX.revive(); break;
+        case 'dead':
+          feed(`${nm(ev[1])} was eaten`, '#ef4444'); break;
+        case 'rs':
+          feed(`${nm(ev[1])} is back in the fight`, '#22c55e'); break;
+        case 'hz':
+          feed(`${nm(ev[1])} sent a zombie after the survivors`, '#a855f7'); break;
+        case 'left':
+          feed(`${nm(ev[1])} left the match`, '#94a3b8'); break;
+      }
+    }
+
+    // ---------- coins ----------
+    function giveCoins(slot, n) {
+      n = Math.round(n);
+      if (n <= 0) return;
+      if (slot === net.myId) { coins += n; updateHUD(); }
+      else { const r = net.roster[slot]; if (r && !r.left) r.evq.push(['k', n]); }
+    }
+
+    // ---------- the Director: waves, hordes, bosses, blood moons, airdrops ----------
+    function dirReset() {
+      Object.assign(director, { wave: 1, waveStart: 0, warned: false, started: false, horde: false, dropped: false, bosses: 0, lastMinion: 0, moon: false });
+      pickups = []; pickupIdCounter = 0;
+      net.wave = 1; net.moon = false; net.waveLeft = 0; net.bosses = [];
+    }
+
+    function startWave(n) {
+      director.wave = n; director.waveStart = frameCount;
+      director.warned = director.started = director.horde = director.dropped = false;
+      director.moon = director.enabled && n % 5 === 0;                       // every 5th wave is a blood moon
+      emitGlobal(['wave', n, director.moon ? 1 : 0]);
+      if (n >= 2) livingList().forEach(r => giveCoins(r.id, 8 * n));          // wave bonus for everyone still standing
+    }
+
+    // zombies appear around every living (not downed) player; hordes make it much busier
+    function baseSpawns(rate, mult) {
+      if (zombies.length >= 500) return;                                      // safety cap
+      const every = Math.max(6, Math.round(rate / mult));
+      livingList().filter(r => !r.downed).forEach((r, i) => {
+        if ((frameCount + i * 5) % every !== 0) return;
+        if (r.id === net.myId) spawnZombie(player.x, player.y, canvas.width, canvas.height, director.horde);
+        else spawnZombie(r.x, r.y, r.vw, r.vh, director.horde);
+      });
+    }
+
+    function directorTick(rate) {
+      if (!director.enabled) { baseSpawns(rate, 1); return; }
+      const t = frameCount - director.waveStart;
+      if (t >= WAVE_TICKS) startWave(director.wave + 1);
+      const bossWave = director.wave % 3 === 0;                               // every 3rd wave has a boss
+      if (!director.warned && t >= 2400) { director.warned = true; emitGlobal(['warn', bossWave ? 1 : 0]); }
+      if (!director.started && t >= 2580) {                                   // the finale of the wave
+        director.started = true; director.horde = true;
+        if (bossWave) spawnBoss();
+      }
+      if (director.horde && t >= 3900) director.horde = false;
+      if (!director.dropped && director.wave % 2 === 0 && t >= 1200) { director.dropped = true; dropCrate(); }   // an airdrop on every even wave
+      if (bossAlive() && frameCount - director.lastMinion > 480) { director.lastMinion = frameCount; summonMinions(); }
+      baseSpawns(rate, director.horde ? (bossWave ? 1.6 : 3) : 1);
+    }
+
+    function bossAlive() { return zombies.some(z => z.type === 'boss'); }
+
+    function spawnBoss() {
+      const living = livingList();
+      if (!living.length) return;
+      const idx = director.bosses++;
+      const anchor = living[Math.floor(Math.random() * living.length)];
+      const ap = anchor.id === net.myId ? player : anchor;
+      const a = Math.random() * Math.PI * 2;
+      const z = new Zombie(ap.x + Math.cos(a) * 680, ap.y + Math.sin(a) * 680, 1 + frameCount / 3600, 'boss');
+      z.maxHp = Math.round(2500 * living.length * (1 + 0.5 * idx)); z.hp = z.maxHp;       // tougher with more players and with every boss
+      z.nameIdx = idx % BOSS_NAMES.length;
+      addZombie(z);
+      director.lastMinion = frameCount;
+      emitGlobal(['boss', z.nameIdx]);
+    }
+
+    function summonMinions() {
+      zombies.filter(z => z.type === 'boss').forEach(b => {
+        for (let i = 0; i < 3; i++) {
+          const a = Math.random() * Math.PI * 2;
+          addZombie(new Zombie(b.x + Math.cos(a) * 70, b.y + Math.sin(a) * 70, 1 + frameCount / 3600, 'normal'));
+        }
+      });
+    }
+
+    function bossList() {
+      return zombies.filter(z => z.type === 'boss').map(z => [z.id, z.nameIdx | 0, Math.ceil(z.hp), Math.round(z.maxHp), Math.round(z.x), Math.round(z.y)]);
+    }
+
+    function bossDefeated(z, owner) {
+      livingList().forEach(r => giveCoins(r.id, 50));                         // everybody alive gets a share
+      const r = net.roster[owner]; if (r) r.boss++;
+      emitGlobal(['bossdead', owner]);
+    }
+
+    function groupCenter() {
+      const l = livingList();
+      if (!l.length) return { x: 0, y: 0 };
+      let sx = 0, sy = 0;
+      l.forEach(r => { const p = r.id === net.myId ? player : r; sx += p.x; sy += p.y; });
+      return { x: sx / l.length, y: sy / l.length };
+    }
+
+    // ---------- power-ups and airdrops ----------
+    class Pickup {
+      constructor(id, type, x, y, ttl) {
+        this.id = id; this.type = type; this.x = x; this.y = y; this.ttl = ttl;
+        this.reach = type === 'crate' ? 46 : 34;
+        this.taken = false;                // guests: I asked for it, waiting for the host to remove it
+      }
+      draw() {
+        if (this.taken) return;
+        if (this.ttl < 300 && Math.floor(this.ttl / 8) % 2 === 0) return;      // blink when about to vanish
+        const info = PICKUP_INFO[this.type] || PICKUP_INFO.coins, big = this.type === 'crate';
+        const bob = Math.sin((frameCount + this.id * 7) * 0.08) * 4;
+        ctx.save();
+        if (big) {                                                              // a light beam you can see from far away
+          const g = ctx.createLinearGradient(this.x, this.y - 900, this.x, this.y);
+          g.addColorStop(0, 'rgba(34,211,238,0)'); g.addColorStop(1, 'rgba(34,211,238,0.35)');
+          ctx.fillStyle = g; ctx.fillRect(this.x - 14, this.y - 900, 28, 900);
+        }
+        const r = big ? 22 : 15;
+        ctx.beginPath(); ctx.arc(this.x, this.y + bob, r + 7 + Math.sin(frameCount * 0.12) * 2, 0, Math.PI * 2);
+        ctx.fillStyle = info.color + '33'; ctx.fill();
+        ctx.beginPath(); ctx.arc(this.x, this.y + bob, r, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(15,23,42,0.88)'; ctx.fill(); ctx.strokeStyle = info.color; ctx.lineWidth = 3; ctx.stroke();
+        ctx.font = (big ? 24 : 18) + 'px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillStyle = '#fff'; ctx.fillText(info.icon, this.x, this.y + bob + 1);
+        ctx.restore();
+      }
+    }
+
+    function drawPickups() { for (let i = 0; i < pickups.length; i++) pickups[i].draw(); }
+
+    function addPickup(type, x, y, ttl) {
+      if (!net.isHost || pickups.length >= 40) return;
+      pickups.push(new Pickup(++pickupIdCounter, type, x, y, ttl || PICKUP_TICKS));
+    }
+
+    function rollPickupType(allowNuke) {
+      const table = [['health', 24], ['damage', 18], ['speed', 16], ['shield', 14], ['coins', 22], ['nuke', allowNuke ? 3 : 0]];
+      let total = 0; table.forEach(e => total += e[1]);
+      let r = Math.random() * total;
+      for (const [k, w] of table) { if ((r -= w) < 0) return k; }
+      return 'coins';
+    }
+
+    function maybeDropPickup(z) {
+      if (!director.enabled) return;
+      if (z.type === 'boss') {
+        for (let i = 0; i < 3; i++) addPickup(rollPickupType(false), z.x + (Math.random() - 0.5) * 90, z.y + (Math.random() - 0.5) * 90, PICKUP_TICKS * 1.5);
+        return;
+      }
+      const base = z.type === 'tank' ? 0.12 : (z.type === 'runner' ? 0.03 : 0.025);
+      if (Math.random() < base * (director.moon ? 1.5 : 1)) addPickup(rollPickupType(true), z.x, z.y, PICKUP_TICKS);
+    }
+
+    function dropCrate() {
+      const c = groupCenter(), a = Math.random() * Math.PI * 2, d = 650 + Math.random() * 250;
+      const x = c.x + Math.cos(a) * d, y = c.y + Math.sin(a) * d;
+      addPickup('crate', x, y, 2400);
+      emitGlobal(['drop', Math.round(x), Math.round(y)]);
+    }
+
+    // every tick: count down, and pick things up that I'm standing on
+    function pickupTick() {
+      for (let i = pickups.length - 1; i >= 0; i--) {
+        const p = pickups[i];
+        p.ttl--;
+        if (p.ttl <= 0 && net.isHost) pickups.splice(i, 1);                   // guests wait for the host's snapshot
+      }
+      if (player.dead || player.downed) return;
+      for (const p of pickups.slice()) {
+        if (p.taken || Math.hypot(p.x - player.x, p.y - player.y) > p.reach) continue;
+        if (net.isHost) hostCollectPickup(net.myId, p.id);
+        else { p.taken = true; net.outPick.push(p.id); }
+      }
+    }
+
+    function applyPickupSnapshot(list) {
+      const byId = new Map(pickups.map(p => [p.id, p]));
+      const next = [];
+      for (const e of list) {                                                  // [id, typeIndex, x, y, ticksLeft]
+        let p = byId.get(e[0]);
+        if (!p) p = new Pickup(e[0], PICKUP_TYPES[e[1]] || 'coins', e[2], e[3], e[4]);
+        p.ttl = e[4];
+        next.push(p);
+      }
+      pickups = next;
+    }
+
+    // Host: somebody walked into a power-up (the first one to ask gets it)
+    function hostCollectPickup(slot, id) {
+      const i = pickups.findIndex(p => p.id === id);
+      if (i < 0) return;
+      const p = pickups.splice(i, 1)[0];
+      const r = net.roster[slot];
+      if (!r || r.left) return;
+      if (p.type === 'nuke') doNuke(slot, p.x, p.y);
+      else if (p.type === 'crate') {
+        for (let k = 0; k < 4; k++) {                                          // the crate bursts open: loot everywhere
+          const a = Math.random() * Math.PI * 2, d = 40 + Math.random() * 45;
+          addPickup(rollPickupType(false), p.x + Math.cos(a) * d, p.y + Math.sin(a) * d, PICKUP_TICKS);
+        }
+        emitGlobal(['pk', slot]);
+      } else givePowerup(slot, p.type);
+    }
+
+    function givePowerup(slot, type) {
+      if (slot === net.myId) applyPowerup(type);
+      else { const r = net.roster[slot]; if (r) r.evq.push(['pu', PICKUP_TYPES.indexOf(type)]); }
+    }
+
+    // me: a power-up takes effect
+    function applyPowerup(type) {
+      const info = PICKUP_INFO[type] || PICKUP_INFO.coins;
+      SFX.pickup();
+      let label = info.name;
+      if (type === 'health') { player.hp = Math.min(player.stats.maxHp, player.hp + player.stats.maxHp * 0.4); label = '+HP'; }
+      else if (type === 'damage') player.buffDmg = 15 * 60;
+      else if (type === 'speed') player.buffSpd = 12 * 60;
+      else if (type === 'shield') player.shieldHp = Math.min(player.maxShield, player.shieldHp + 50);
+      else if (type === 'coins') coins += 25;
+      floatTexts.push(new FloatingText(player.x, player.y - 30, label, info.color));
+      updateHUD();
+    }
+
+    // Host: a nuke wipes out every normal zombie (bosses just lose some health). The one who grabbed it gets the coins.
+    function doNuke(slot, x, y) {
+      let total = 0, kills = 0;
+      for (let i = zombies.length - 1; i >= 0; i--) {
+        const z = zombies[i];
+        if (z.type === 'boss') { z.hp = Math.max(1, z.hp - z.maxHp * 0.12); continue; }
+        total += z.coinReward * (director.moon ? 2 : 1); kills++;
+        removeZombieAt(i);
+      }
+      giveCoins(slot, total);
+      const r = net.roster[slot]; if (r) r.kills += kills;
+      emitGlobal(['nuke', Math.round(x), Math.round(y), slot]);
+    }
+
+    // ---------- co-op: downed, revive, respawn ----------
+    function teammateCanRevive() {
+      return rosterList().some(r => r.id !== net.myId && r.alive && !r.left && !r.downed);
+    }
+
+    // my health hit zero
+    function onLocalZeroHp() {
+      if (net.mode === 'coop' && teammateCanRevive()) onLocalDowned();
+      else onLocalDeathMp();
+    }
+
+    function onLocalDowned() {
+      player.downed = true; player.downTimer = DOWN_TICKS; player.reviveProgress = 0;
+      player.hp = 0; player.isReloading = false; player.isHealing = false;
+      reloadWarning.style.display = 'none';
+      hpContainer.classList.remove('low-health');
+      const me = net.roster[net.myId]; if (me) { me.downed = true; me.hp = 0; }
+      SFX.down();
+      if (net.isHost) emitGlobal(['dn', net.myId]); else guestSend();
+      updateHUD(); updateMpBanner(); updateMpPanel();
+    }
+
+    // every tick while I'm down: bleed out, or get revived by a friend standing next to me
+    function downedTick() {
+      if (!player.downed) return;
+      player.downTimer--;
+      const near = rosterList().some(r => r.id !== net.myId && r.alive && !r.left && !r.downed && Math.hypot(r.dx - player.x, r.dy - player.y) < REVIVE_RANGE);
+      player.reviveProgress = clamp(player.reviveProgress + (near ? 1 / REVIVE_TICKS : -1 / 240), 0, 1);
+      if (player.reviveProgress >= 1) onLocalRevived();
+      else if (player.downTimer <= 0) { player.downed = false; onLocalDeathMp(); }
+    }
+
+    function onLocalRevived() {
+      player.downed = false; player.reviveProgress = 0;
+      player.hp = player.stats.maxHp * 0.5; player.invuln = 180;
+      const me = net.roster[net.myId]; if (me) { me.downed = false; me.hp = player.hp; }
+      floatTexts.push(new FloatingText(player.x, player.y - 30, 'REVIVED!', '#22c55e'));
+      SFX.revive();
+      updateHUD(); updateMpBanner(); updateMpPanel();
+      if (net.isHost) hostCreditRevive(me); else guestSend();
+    }
+
+    // Host: someone just got back up. The closest living friend gets the credit.
+    function hostCreditRevive(r) {
+      if (!r) return;
+      let best = null, bd = 140;
+      livingList().forEach(o => {
+        if (o.id === r.id || o.downed) return;
+        const p = o.id === net.myId ? player : o;
+        const q = r.id === net.myId ? player : r;
+        const d = Math.hypot(p.x - q.x, p.y - q.y);
+        if (d < bd) { bd = d; best = o; }
+      });
+      if (best) { best.rev++; emitGlobal(['rv', best.id, r.id]); }
+    }
+
+    // Host: a player is really dead now
+    function hostPlayerDied(r) {
+      r.alive = false; r.downed = false; r.deathTick = frameCount; r.deaths++;
+      r.respawnAt = frameCount + RESPAWN_TICKS;
+      emitGlobal(['dead', r.id]);
+      hostCheckMatchEnd();
+    }
+
+    // Host (co-op): dead players come back 30 s later, next to a living friend
+    function respawnTick() {
+      if (net.mode !== 'coop' || net.state !== 'playing') return;
+      rosterList().forEach(r => {
+        if (r.alive || r.left || !r.respawnAt || frameCount < r.respawnAt) return;
+        if (livingList().length) respawnPlayer(r);
+      });
+    }
+
+    function respawnPlayer(r) {
+      const l = livingList(), a0 = l.find(x => !x.downed) || l[0];
+      const ap = a0 ? (a0.id === net.myId ? player : a0) : { x: 0, y: 0 };
+      const ang = Math.random() * Math.PI * 2, x = ap.x + Math.cos(ang) * 70, y = ap.y + Math.sin(ang) * 70;
+      r.alive = true; r.downed = false; r.life = (r.life || 0) + 1; r.respawnAt = 0; r.hp = r.mhp * 0.6;
+      if (r.id === net.myId) respawnLocal(x, y, r.life);
+      else r.evq.push(['rs', Math.round(x), Math.round(y), r.life]);
+      emitGlobal(['rs', r.id]);
+    }
+
+    // me: back from the dead
+    function respawnLocal(x, y, life) {
+      player.dead = false; player.downed = false; player.life = life;
+      player.x = x; player.y = y; player.hp = player.stats.maxHp * 0.6; player.shieldHp = 0;
+      player.invuln = 240; player.reviveProgress = 0;
+      const me = net.roster[net.myId]; if (me) { me.alive = true; me.downed = false; me.hp = player.hp; }
+      net.spectateId = -1;
+      floatTexts.push(new FloatingText(player.x, player.y - 30, 'BACK IN THE FIGHT!', '#22c55e'));
+      SFX.revive();
+      updateHUD(); updateMpBanner(); updateMpPanel();
+    }
+
+    // ---------- last standing: the dead can send zombies after the survivors ----------
+    function hauntRequest() {
+      if (net.mode !== 'last' || net.state !== 'playing' || !player.dead || player.haunt < 1) return;
+      const t = net.roster[net.spectateId];
+      if (!t) return;
+      player.haunt -= 1;
+      if (net.isHost) spawnHaunt(net.myId, t.dx, t.dy);
+      else net.outHaunt = true;                       // the host aims it at whoever I'm watching (my camera centre)
+      updateMpBanner();
+    }
+
+    function spawnHaunt(slot, tx, ty) {
+      const roll = Math.random();
+      const type = roll < 0.45 ? 'runner' : (roll < 0.85 ? 'normal' : 'tank');
+      const a = Math.random() * Math.PI * 2, d = 480 + Math.random() * 80;
+      addZombie(new Zombie(tx + Math.cos(a) * d, ty + Math.sin(a) * d, 1 + frameCount / 3600, type));
+      emitGlobal(['hz', slot]);
+    }
+
+    // ---------- drawing ----------
+    function drawDownedPlayer(x, y, col, name, rev01, bleed01) {
+      const pulse = 0.5 + 0.5 * Math.sin(frameCount * 0.15);
+      ctx.save();
+      ctx.beginPath(); ctx.arc(x, y, 18, 0, Math.PI * 2);
+      ctx.globalAlpha = 0.5; ctx.fillStyle = col; ctx.fill();
+      ctx.globalAlpha = 1; ctx.strokeStyle = `rgba(239,68,68,${0.5 + 0.5 * pulse})`; ctx.lineWidth = 4; ctx.stroke();
+      ctx.beginPath(); ctx.arc(x, y, 30, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * clamp(rev01, 0, 1));      // green ring fills while a friend stands next to them
+      ctx.strokeStyle = '#22c55e'; ctx.lineWidth = 5; ctx.stroke();
+      ctx.fillStyle = 'rgba(0,0,0,0.8)'; ctx.fillRect(x - 22, y + 36, 44, 6);                                  // bleed-out bar
+      ctx.fillStyle = '#ef4444'; ctx.fillRect(x - 22, y + 36, 44 * clamp(bleed01, 0, 1), 6);
+      ctx.font = '16px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = '#fff'; ctx.fillText('🩹', x, y + 1);
+      ctx.restore();
+      if (name) drawNameTag(name, x, y - 40, col);
+    }
+
+    function drawBuffRings(x, y, dmg, spd) {
+      if (!dmg && !spd) return;
+      ctx.save();
+      if (dmg) { ctx.beginPath(); ctx.arc(x, y, 24, 0, Math.PI * 2); ctx.strokeStyle = 'rgba(249,115,22,0.8)'; ctx.lineWidth = 3; ctx.stroke(); }
+      if (spd) { ctx.beginPath(); ctx.arc(x, y, 28, 0, Math.PI * 2); ctx.setLineDash([6, 6]); ctx.strokeStyle = 'rgba(250,204,21,0.85)'; ctx.lineWidth = 3; ctx.stroke(); }
+      ctx.restore();
+    }
+
+    function drawBoss(z) {
+      const enraged = z.hp < z.maxHp * 0.35, pulse = 0.5 + 0.5 * Math.sin(frameCount * (enraged ? 0.35 : 0.12));
+      ctx.save();
+      ctx.beginPath(); ctx.arc(z.x + 5, z.y + 5, z.radius, 0, Math.PI * 2); ctx.fillStyle = 'rgba(0,0,0,0.35)'; ctx.fill();
+      ctx.beginPath(); ctx.arc(z.x, z.y, z.radius + 10 + pulse * 8, 0, Math.PI * 2);
+      ctx.fillStyle = enraged ? 'rgba(239,68,68,0.28)' : 'rgba(168,85,247,0.22)'; ctx.fill();
+      ctx.fillStyle = '#450a0a';
+      for (let i = 0; i < 12; i++) {                                                                           // spikes
+        const a = (i / 12) * Math.PI * 2 + frameCount * 0.004;
+        ctx.beginPath();
+        ctx.moveTo(z.x + Math.cos(a - 0.12) * z.radius, z.y + Math.sin(a - 0.12) * z.radius);
+        ctx.lineTo(z.x + Math.cos(a) * (z.radius + 14), z.y + Math.sin(a) * (z.radius + 14));
+        ctx.lineTo(z.x + Math.cos(a + 0.12) * z.radius, z.y + Math.sin(a + 0.12) * z.radius);
+        ctx.closePath(); ctx.fill();
+      }
+      ctx.beginPath(); ctx.arc(z.x, z.y, z.radius, 0, Math.PI * 2);
+      ctx.fillStyle = enraged ? '#b91c1c' : '#7f1d1d'; ctx.fill(); ctx.strokeStyle = '#fca5a5'; ctx.lineWidth = 4; ctx.stroke();
+      ctx.fillStyle = '#fde047';
+      ctx.beginPath(); ctx.arc(z.x - 14, z.y - 8, 6, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(z.x + 14, z.y - 8, 6, 0, Math.PI * 2); ctx.fill();
+      ctx.restore();
+    }
+
+    // little arrows at the edge of the screen pointing at things you can't see: bosses, airdrops, downed friends
+    function drawEdgeArrow(wx, wy, color, icon) {
+      const w = canvas.width, h = canvas.height, m = 38;
+      const sx = wx - camera.x, sy = wy - camera.y;
+      if (sx > m && sx < w - m && sy > m && sy < h - m) return;
+      const cx = w / 2, cy = h / 2, dx = sx - cx, dy = sy - cy;
+      const k = Math.min((w / 2 - m) / Math.max(1e-6, Math.abs(dx)), (h / 2 - m) / Math.max(1e-6, Math.abs(dy)));
+      let ax = cx + dx * k, ay = cy + dy * k;
+      const ang = Math.atan2(dy, dx);
+      for (const [rx, ry, rw, rh] of [[0, 0, 520, 115], [w - 260, 0, 260, 270], [w / 2 - 230, 0, 460, 70]]) {      // keep arrows out from behind the health bar, player list and boss bar
+        if (ax > rx && ax < rx + rw && ay > ry && ay < ry + rh) ay = ry + rh + 14;
+      }
+      ctx.save();
+      ctx.translate(ax, ay); ctx.rotate(ang);
+      ctx.beginPath(); ctx.moveTo(14, 0); ctx.lineTo(-8, -10); ctx.lineTo(-8, 10); ctx.closePath();
+      ctx.fillStyle = color; ctx.fill();
+      ctx.restore();
+      ctx.save();
+      ctx.font = '16px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillStyle = '#fff';                                         // (symbols like the skull are drawn in the fill colour)
+      ctx.fillText(icon, ax - Math.cos(ang) * 24, ay - Math.sin(ang) * 24);
+      ctx.restore();
+    }
+
+    // screen-space effects, drawn after the world
+    function drawMpOverlays() {
+      const w = canvas.width, h = canvas.height;
+      net.bosses.forEach(b => drawEdgeArrow(b[4], b[5], '#ef4444', '☠'));
+      pickups.forEach(p => { if (p.type === 'crate' && !p.taken) drawEdgeArrow(p.x, p.y, '#22d3ee', '📦'); });
+      if (net.mode === 'coop') {
+        rosterList().forEach(r => { if (r.id !== net.myId && r.alive && r.downed && !r.left) drawEdgeArrow(r.dx, r.dy, '#22c55e', '🩹'); });
+      }
+      if (net.moon) { ctx.fillStyle = 'rgba(127,29,29,0.16)'; ctx.fillRect(0, 0, w, h); }
+      if (player.downed) {
+        const pulse = (Math.sin(frameCount * 0.12) + 1) / 2;
+        ctx.fillStyle = `rgba(153,27,27,${0.25 + pulse * 0.2})`; ctx.fillRect(0, 0, w, h);
+      }
+      if (fx.flash > 0) { ctx.fillStyle = `rgba(255,255,255,${Math.min(0.85, fx.flash / 24)})`; ctx.fillRect(0, 0, w, h); }
+    }
+
+    // ---------- HUD bits: boss bar, power-up timers ----------
+    function updateBossBar() {
+      const el = document.getElementById('mp-bossbar');
+      if (!net.bosses.length) { if (el.style.display !== 'none') el.style.display = 'none'; return; }
+      el.innerHTML = net.bosses.slice(0, 2).map(b =>
+        `<div class="boss-row"><div class="boss-name">☠ ${esc(BOSS_NAMES[b[1] % BOSS_NAMES.length])}</div><div class="boss-hp"><div style="width:${clamp(b[2] / Math.max(1, b[3]) * 100, 0, 100)}%"></div></div></div>`).join('');
+      el.style.display = 'block';
+    }
+
+    function updateBuffsHud() {
+      const el = document.getElementById('hud-buffs');
+      const parts = [];
+      if (player.buffDmg > 0) parts.push(`🔥 ${Math.ceil(player.buffDmg / 60)}s`);
+      if (player.buffSpd > 0) parts.push(`⚡ ${Math.ceil(player.buffSpd / 60)}s`);
+      if (!parts.length) { if (el.style.display !== 'none') el.style.display = 'none'; return; }
+      el.textContent = parts.join('  ');
+      el.style.display = 'block';
+    }
+
+    // ---------- lobby: pick the game mode ----------
+    function setRoomMode(m) {
+      if (!net.active || !net.isHost || net.state === 'playing') return;
+      net.mode = (m === 'last') ? 'last' : 'coop';
+      hostBroadcastLobby();
+    }
+
+    // ---------- results: stats, awards, bonus coins, personal records ----------
+    const MP_RECORD_KEY = 'zombieSurvivors_mpRecords';
+    const matchScore = p => p.kills + 3 * p.rev + 20 * p.boss;
+
+    function loadMpRecords() {
+      try { return JSON.parse(localStorage.getItem(MP_RECORD_KEY)) || {}; } catch (e) { return {}; }
+    }
+
+    function computeAwards(players) {
+      const aw = {};
+      if (players.length < 2) return aw;
+      const give = (p, text) => { if (p) { (aw[p.id] = aw[p.id] || []); if (aw[p.id].length < 2) aw[p.id].push(text); } };
+      const top = key => { const m = Math.max(...players.map(p => p[key])); return m > 0 ? players.find(p => p[key] === m) : null; };
+      give(top('boss'), '☠️ Boss slayer');
+      give(top('rev'), '💉 Medic');
+      give(top('kills'), '🎯 Most kills');
+      give(top('dmg'), '💥 Top damage');
+      return aw;
+    }
+
+    // how many bonus coins this match is worth to me
+    function matchBonus(res) {
+      const me = res.players.find(p => p.id === net.myId);
+      if (!me) return { total: 0, parts: [] };
+      const parts = [];
+      if (res.mode === 'coop') {
+        const w = Math.max(0, res.wave - 1) * 12; if (w) parts.push(`${res.wave - 1} wave${res.wave - 1 === 1 ? '' : 's'} survived`);
+        const rv = me.rev * 10; if (rv) parts.push(`${me.rev} revive${me.rev === 1 ? '' : 's'}`);
+        const bs = me.boss * 30; if (bs) parts.push(`${me.boss} boss${me.boss === 1 ? '' : 'es'}`);
+        return { total: w + rv + bs, parts };
+      }
+      const surv = Math.floor(me.ticks / 1800) * 5; if (surv) parts.push(`${fmtTime(me.ticks / 60)} survived`);
+      const win = (res.players.length > 1 && res.players[0].id === me.id) ? 60 : 0; if (win) parts.push('victory');
+      return { total: surv + win, parts };
+    }
+
+    // returns the "personal best" line for the results screen (and remembers new records)
+    function updateMpRecords(res) {
+      const rec = loadMpRecords();
+      let line = '', fresh = false;
+      if (res.mode === 'coop') {
+        const b = rec.coop || { wave: 0, ticks: 0 };
+        if (res.wave > b.wave || (res.wave === b.wave && res.ticks > b.ticks)) { rec.coop = { wave: res.wave, ticks: res.ticks }; fresh = true; }
+        const best = rec.coop || b;
+        line = fresh ? `🏆 NEW BEST: wave ${res.wave} (${fmtTime(res.ticks / 60)})` : `Your best: wave ${best.wave} (${fmtTime(best.ticks / 60)})`;
+      } else {
+        const me = res.players.find(p => p.id === net.myId);
+        const t = me ? me.ticks : 0, b = rec.last || { ticks: 0 };
+        if (t > b.ticks) { rec.last = { ticks: t }; fresh = true; }
+        line = fresh ? `🏆 NEW BEST: ${fmtTime(t / 60)}` : `Your best: ${fmtTime(b.ticks / 60)}`;
+      }
+      try { localStorage.setItem(MP_RECORD_KEY, JSON.stringify(rec)); } catch (e) {}
+      return { line, fresh };
+    }
+    // --- GUN SYSTEM DATA ---
+    const defaultGuns = {
+      pistol:  { id: 'pistol',  name: "Pistol",        icon: "🔫", basePrice: 50,    level: 1, baseDmg: 25, baseFr: 260, mag: 12, reload: 1500, count: 1, spread: 0.08, color: "#ffffff", pierce: 1, sound: 'shoot' },
+      shotgun: { id: 'shotgun', name: "Shotgun",       icon: "💥", basePrice: 200,  level: 0, baseDmg: 14, baseFr: 750, mag: 6,  reload: 2400, count: 6, spread: 0.35, color: "#fb923c", pierce: 1, sound: 'shotgun' },
+      rifle:   { id: 'rifle',   name: "Assault Rifle", icon: "⚡", basePrice: 500,  level: 0, baseDmg: 18, baseFr: 100, mag: 30, reload: 1800, count: 1, spread: 0.16, color: "#38bdf8", pierce: 1, sound: 'rifle' },
+      plasma:  { id: 'plasma',  name: "Plasma Cannon", icon: "🔮", basePrice: 1000, level: 0, baseDmg: 80, baseFr: 850, mag: 5,  reload: 2500, count: 1, spread: 0.02, color: "#a855f7", pierce: 4, sound: 'plasma' }
+    };
+    let guns = JSON.parse(JSON.stringify(defaultGuns));
+    let equippedGun = 'pistol';
+
+    // --- ADMIN SYSTEM ---
+    let adminGodMode = false;
+    let adminInfAmmo = false;
+    let hasUsedAdmin = false;
+    const adminPanel = document.getElementById("admin-panel");
+
+    function adminAddCoins() {
+      hasUsedAdmin = true;
+      coins += 10000;
+      updateHUD();
+      if(mainMenu.style.display !== "none") renderShop();
+    }
+
+    function adminToggleGodMode() {
+      hasUsedAdmin = true;
+      adminGodMode = !adminGodMode;
+      document.getElementById("btn-godmode").innerText = `🛡️ God Mode: ${adminGodMode ? 'ON' : 'OFF'}`;
+      if(player && adminGodMode) {
+        player.hp = player.stats.maxHp;
+        updateHUD();
+      }
+    }
+
+    function adminMaxUpgrades() {
+      hasUsedAdmin = true;
+      Object.values(upgrades).forEach(upg => upg.level = 10);
+      Object.values(guns).forEach(g => { if(g.level === 0) g.level = 1; g.level = 10; });
+      if(mainMenu.style.display !== "none") renderShop();
+    }
+
+    function adminToggleInfAmmo() {
+      hasUsedAdmin = true;
+      adminInfAmmo = !adminInfAmmo;
+      document.getElementById("btn-infammo").innerText = `🔫 Inf Ammo: ${adminInfAmmo ? 'ON' : 'OFF'}`;
+      if(player && adminInfAmmo) {
+        player.ammo = player.getGunStat('mag');
+        updateHUD();
+      }
+    }
+
+    function adminSpawnZombies() {
+      hasUsedAdmin = true;
+      if (isPlaying) {
+        for(let i=0; i<10; i++) spawnZombie();
+      }
+    }
+
+    // Entity Arrays
+    let decorations = [];
+    let bullets = [];
+    let zombies = [];
+    let particles = [];
+    let floatTexts = [];
+    let defenses = [];
+    let player = null;
+
+    // Inventories and Items
+    const defaultInventory = { medkit: 0, food: 0, shield: 0, turret: 0, bodyguard: 0 };
+    let inventory = Object.assign({}, defaultInventory);
+    
+    const itemsList = {
+      medkit: { id: 'medkit', name: "Medkit", icon: "🩹", desc: "Hold 'Q' (4s) to heal 50 HP mid-game.", price: 75 },
+      food: { id: 'food', name: "Canned Food", icon: "🥫", desc: "Press 'E' to instantly heal 20 HP.", price: 25 },
+      shield: { id: 'shield', name: "Energy Shield", icon: "🛡️", desc: "Press '3' for a 50 HP Overshield.", price: 100 },
+      turret: { id: 'turret', name: "Auto-Turret", icon: "🤖", desc: "Press '1' to deploy a defense turret.", price: 150 },
+      bodyguard: { id: 'bodyguard', name: "Bodyguard", icon: "👮", desc: "Press '2' to summon an AI ally.", price: 250 }
+    };
+
+    // Upgrades
+    const defaultUpgrades = {
+      health:      { id: 'health', name: "Max Health", icon: "❤️", desc: "Increase maximum player health.", basePrice: 10, level: 1 },
+      speed:       { id: 'speed', name: "Move Speed", icon: "👟", desc: "Run faster.", basePrice: 20, level: 1 },
+      regen:       { id: 'regen', name: "Regeneration", icon: "🩹", desc: "Heal over time during combat.", basePrice: 50, level: 0 },
+      reloadSpeed: { id: 'reloadSpeed', name: "Sleight of Hand", icon: "⚡", desc: "Reload all weapons faster.", basePrice: 25, level: 1 }
+    };
+    let upgrades = JSON.parse(JSON.stringify(defaultUpgrades));
+
+    // --- NEW SAVE / LOAD SYSTEM ---
+    const NEW_SAVE_KEY = 'zombieSurvivors_V13_Save';
+
+    function saveGameData() {
+      const saveData = { coins: coins, upgrades: upgrades, inventory: inventory, guns: guns, equippedGun: equippedGun, settings: settings };
+      try {
+        const safeString = btoa(encodeURIComponent(JSON.stringify(saveData)));
+        localStorage.setItem(NEW_SAVE_KEY, safeString);
+        saveStatusMsg.textContent = "💾 Game Saved!";
+        saveStatusMsg.classList.add("show");
+        setTimeout(() => { saveStatusMsg.classList.remove("show"); }, 2000);
+      } catch (e) {
+        console.error("Save failed", e);
+      }
+    }
+
+    function loadGameData() {
+      try {
+        const savedData = localStorage.getItem(NEW_SAVE_KEY);
+        if (savedData) {
+          const decoded = JSON.parse(decodeURIComponent(atob(savedData)));
+          applySaveData(decoded);
+        }
+      } catch (e) {
+        console.error("Load failed, save might be corrupted.");
+      }
+    }
+
+    function applySaveData(parsedData) {
+      if (parsedData.coins !== undefined) coins = parsedData.coins;
+      if (parsedData.settings) settings = { ...settings, ...parsedData.settings };
+      if (parsedData.inventory) inventory = { ...defaultInventory, ...parsedData.inventory };
+      if (parsedData.upgrades) {
+        for (let key in parsedData.upgrades) {
+          if (upgrades[key]) upgrades[key].level = parsedData.upgrades[key].level;
+        }
+      }
+      if (parsedData.guns) {
+        for (let key in parsedData.guns) {
+          if (guns[key]) guns[key].level = parsedData.guns[key].level;
+        }
+      }
+      if (parsedData.equippedGun && guns[parsedData.equippedGun]) {
+        equippedGun = parsedData.equippedGun;
+      }
+      renderShop();
+    }
+
+    // --- SETTINGS & DEATH SCREEN LOGIC ---
+    function openSettings() {
+      updateSettingsUI();
+      document.getElementById("settings-modal").style.display = "flex";
+    }
+    
+    function closeSettings() {
+      document.getElementById("settings-modal").style.display = "none";
+      saveGameData();
+    }
+
+    function toggleSetting(key) {
+      settings[key] = !settings[key];
+      updateSettingsUI();
+    }
+
+    function updateSettingsUI() {
+      document.getElementById("toggle-blood-btn").innerText = `🩸 Blood Particles: ${settings.blood ? 'ON' : 'OFF'}`;
+      document.getElementById("toggle-death-btn").innerText = `💀 Death Screen: ${settings.deathScreen ? 'ON' : 'OFF'}`;
+    }
+
+    function showDeathScreen() {
+      isPlaying = false; 
+      cancelAnimationFrame(animationId);
+      document.getElementById("death-stats").innerText = `You survived for ${Math.floor(frameCount / 60)} seconds!`;
+      document.getElementById("death-screen").style.display = "flex";
+      hud.style.display = "none";
+      reloadWarning.style.display = "none";
+    }
+
+    function confirmDeath() {
+      document.getElementById("death-screen").style.display = "none";
+      gameOver();
+    }
+
+    // --- MODALS ---
+    function closeModal() { customModal.style.display = 'none'; }
+    
+    function exportNewSave() {
+
+      const saveData = { coins: coins, upgrades: upgrades, inventory: inventory, guns: guns, equippedGun: equippedGun, settings: settings };
+      const saveString = btoa(encodeURIComponent(JSON.stringify(saveData)));
+      if (hasUsedAdmin) {
+        modalTitle.textContent = "❌ SAVE DISABLED";
+        modalDesc.textContent = "You cannot generate a save code because admin cheats were used in this session.";
+        modalTextarea.style.display = "none";
+        modalActionBtn.textContent = "UNDERSTOOD"; 
+        modalActionBtn.style.backgroundColor = "var(--danger)";
+        modalActionBtn.onclick = closeModal;
+        customModal.style.display = 'flex';
+        return; 
+      }
+
+      modalTitle.textContent = "📥 YOUR SAVE CODE";
+      modalDesc.textContent = "Copy this secure code and keep it safe!";
+      modalTextarea.style.display = "block"; 
+      modalTextarea.value = saveString;
+      
+      modalActionBtn.textContent = "COPY CODE"; 
+      modalActionBtn.style.backgroundColor = "var(--primary)";
+      modalActionBtn.onclick = async () => {
+        modalTextarea.select();
+        try { 
+          await navigator.clipboard.writeText(modalTextarea.value); 
+          modalActionBtn.textContent = "COPIED!"; 
+        } catch (e) { 
+          document.execCommand('copy'); 
+          modalActionBtn.textContent = "COPIED!"; 
+        }
+        setTimeout(closeModal, 1500);
+      };
+      customModal.style.display = 'flex';
+    }
+
+    function importNewSave() {
+      modalTitle.textContent = "📤 LOAD SAVE CODE";
+      modalDesc.textContent = "Paste your secure save code below.";
+      modalTextarea.style.display = "block"; 
+      modalTextarea.value = "";
+      
+      modalActionBtn.textContent = "LOAD GAME"; 
+      modalActionBtn.style.backgroundColor = "var(--secondary)";
+      modalActionBtn.onclick = () => {
+        try {
+          const decoded = JSON.parse(decodeURIComponent(atob(modalTextarea.value)));
+          applySaveData(decoded); 
+          saveGameData(); 
+          modalActionBtn.textContent = "SUCCESS!"; 
+          modalActionBtn.style.backgroundColor = "var(--primary)";
+          setTimeout(closeModal, 1000);
+        } catch (e) { 
+          modalActionBtn.textContent = "INVALID CODE!"; 
+          modalActionBtn.style.backgroundColor = "var(--danger)"; 
+          setTimeout(() => {
+            modalActionBtn.textContent = "LOAD GAME"; 
+            modalActionBtn.style.backgroundColor = "var(--secondary)";
+          }, 1500);
+        }
+      };
+      customModal.style.display = 'flex';
+    }
+
+    function showResetModal() {
+      modalTitle.textContent = "⚠️ WIPE SAVE";
+      modalDesc.textContent = "Delete all progress? This cannot be undone.";
+      modalTextarea.style.display = "none";
+      modalActionBtn.textContent = "DELETE EVERYTHING"; modalActionBtn.style.backgroundColor = "var(--danger)";
+      modalActionBtn.onclick = () => {
+        try { localStorage.removeItem(NEW_SAVE_KEY); } catch(e) {}
+        coins = 0; upgrades = JSON.parse(JSON.stringify(defaultUpgrades)); 
+        guns = JSON.parse(JSON.stringify(defaultGuns)); equippedGun = 'pistol';
+        inventory = Object.assign({}, defaultInventory);
+        renderShop(); closeModal();
+      };
+      customModal.style.display = 'flex';
+    }
+
+    // --- SHOP ---
+    function renderShop() {
+      menuCoinsDisplay.textContent = coins;
+      const gridGuns = document.getElementById("shop-grid-guns");
+      const gridUpg = document.getElementById("shop-grid-upgrades");
+      const gridItems = document.getElementById("shop-grid-items");
+      gridGuns.innerHTML = ''; gridUpg.innerHTML = ''; gridItems.innerHTML = '';
+
+    // GUNS SHOP
+      Object.values(guns).forEach(gun => {
+        const isUnlocked = gun.level > 0;
+        const isEquipped = equippedGun === gun.id;
+        
+        const cost = isUnlocked 
+          ? Math.floor(gun.basePrice * Math.pow(1.6, gun.level)) 
+          : gun.basePrice;
+        const canAfford = coins >= cost;
+
+        const currentDmg = gun.baseDmg + (gun.level * 8);
+        const currentFr = Math.max(50, gun.baseFr - (gun.level * 15));
+        const currentMag = gun.mag + (gun.level * 2);
+
+        gridGuns.innerHTML += `
+          <div class="shop-card">
+            <div class="card-header">
+              <div class="card-icon">${gun.icon}</div>
+              <div>
+                <h3 class="card-title">${gun.name}</h3>
+                <div class="card-lvl">${isUnlocked ? 'LEVEL ' + gun.level : 'LOCKED'}</div>
+              </div>
+            </div>
+            <p class="card-desc">Dmg: ${currentDmg} | Mag: ${currentMag} | Speed: ${currentFr}ms</p>
+            <div style="display:flex; gap:8px;">
+              <button class="buy-btn" style="flex:1;" ${!canAfford ? 'disabled' : ''} onclick="buyGun('${gun.id}')">
+                ${!isUnlocked ? `UNLOCK - ${cost} 🪙` : `UPGRADE - ${cost} 🪙`}
+              </button>
+              ${isUnlocked ? `
+                <button class="buy-btn" style="background:${isEquipped ? 'var(--primary)' : 'rgba(255,255,255,0.1)'};" onclick="equipGun('${gun.id}')">
+                  ${isEquipped ? 'EQUIPPED' : 'EQUIP'}
+                </button>
+              ` : ''}
+            </div>
+          </div>`;
+      });
+
+      // UPGRADES SHOP
+      Object.values(upgrades).forEach(upg => {
+        const cost = Math.floor(upg.basePrice * Math.pow(1.5, upg.level === 0 ? 0 : upg.level));
+        const canAfford = coins >= cost;
+        gridUpg.innerHTML += `
+          <div class="shop-card">
+            <div class="card-header">
+              <div class="card-icon">${upg.icon}</div>
+              <div><h3 class="card-title">${upg.name}</h3><div class="card-lvl">LEVEL ${upg.level}</div></div>
+            </div>
+            <p class="card-desc">${upg.desc}</p>
+            <button class="buy-btn" ${!canAfford ? 'disabled' : ''} onclick="buyUpgrade('${upg.id}')">UPGRADE - ${cost} 🪙</button>
+          </div>`;
+      });
+
+      // ITEMS SHOP
+      Object.values(itemsList).forEach(item => {
+        const canAfford = coins >= item.price;
+        gridItems.innerHTML += `
+          <div class="shop-card">
+            <div class="card-header">
+              <div class="card-icon">${item.icon}</div>
+              <div><h3 class="card-title">${item.name}</h3><div class="card-lvl">Owned: ${inventory[item.id] || 0}</div></div>
+            </div>
+            <p class="card-desc">${item.desc}</p>
+            <div style="display: flex; gap: 8px; align-items: center;">
+              <input type="number" id="qty-${item.id}" value="1" min="1" 
+                     style="width: 60px; padding: 8px; background: rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.2); color: white; border-radius: 8px; font-family: inherit; font-weight: bold; text-align: center;"
+                     oninput="updateItemCost('${item.id}', ${item.price})">
+              <button class="buy-btn" id="btn-${item.id}" style="flex: 1;" ${!canAfford ? 'disabled' : ''} onclick="buyItemAmount('${item.id}')">
+                BUY - ${item.price} 🪙
+              </button>
+            </div>
+          </div>`;
+      });
+    }
+
+  function buyGun(id) {
+      const gun = guns[id];
+      const isUnlocked = gun.level > 0;
+      const cost = isUnlocked ? Math.floor(gun.basePrice * Math.pow(1.6, gun.level)) : gun.basePrice;
+      
+      if (coins >= cost) {
+        coins -= cost;
+        gun.level++;
+        if (!isUnlocked) equippedGun = id; 
+        renderShop(); 
+        saveGameData();
+      }
+    }
+
+    function equipGun(id) {
+      if (guns[id] && guns[id].level > 0) {
+        equippedGun = id;
+        renderShop(); saveGameData();
+      }
+    }
+
+    function buyUpgrade(id) {
+      const upg = upgrades[id];
+      const cost = Math.floor(upg.basePrice * Math.pow(1.5, upg.level === 0 ? 0 : upg.level));
+      if (coins >= cost) { coins -= cost; upg.level++; renderShop(); saveGameData(); }
+    }
+
+    function updateItemCost(id, basePrice) {
+      const qtyInput = document.getElementById(`qty-${id}`);
+      let qty = parseInt(qtyInput.value) || 1;
+      
+      if (qty < 1) { 
+        qty = 1; 
+        qtyInput.value = 1; 
+      }
+      
+      const totalCost = basePrice * qty;
+      const btn = document.getElementById(`btn-${id}`);
+      
+      btn.innerText = `BUY - ${totalCost} 🪙`;
+      btn.disabled = coins < totalCost;
+    }
+
+    function buyItemAmount(id) {
+      const qty = parseInt(document.getElementById(`qty-${id}`).value) || 1;
+      const totalCost = itemsList[id].price * qty;
+      
+      if (coins >= totalCost) { 
+        coins -= totalCost; 
+        inventory[id] += qty; 
+        renderShop(); 
+        saveGameData(); 
+      }
+    }
+
+    // --- PAUSE SYSTEM ---
+    function togglePause() {
+      if (net.active && isPlaying) { toggleMatchMenu(); return; }   // multiplayer can't pause: it opens a menu instead
+      if (!isPlaying) return;
+      if (!isPaused) {
+        isPaused = true;
+        pauseStartTime = Date.now();
+        pauseOverlay.style.display = "flex";
+        pauseBtn.innerText = "▶ RESUME (P)";
+      } else {
+        isPaused = false;
+        let pauseDuration = Date.now() - pauseStartTime;
+        
+        if (player) {
+          player.lastShot += pauseDuration;
+          player.lastEmptySound += pauseDuration;
+          player.lastHurtSound += pauseDuration;
+          if (player.isReloading) player.reloadStartTime += pauseDuration;
+          if (player.isHealing) player.healStartTime += pauseDuration;
+        }
+        defenses.forEach(d => d.lastShot += pauseDuration);
+        
+        pauseOverlay.style.display = "none";
+        pauseBtn.innerText = "⏸ PAUSE (P)";
+      }
+    }
+
+    // --- INPUT CONTROLS ---
+    let keys = {};
+    let mouse = { x: 0, y: 0, isDown: false };
+    
+    window.addEventListener("keyup", e => keys[e.key.toLowerCase()] = false);
+    window.addEventListener("mousemove", e => { mouse.x = e.clientX; mouse.y = e.clientY; });
+    window.addEventListener("mousedown", () => {
+      mouse.isDown = true;
+      if (isPlaying && net.active && player && player.dead) cycleSpectate();   // dead: click to watch someone else
+    });
+    window.addEventListener("mouseup", () => mouse.isDown = false);
+    
+    // Weapon switching with scroll wheel
+    window.addEventListener("wheel", e => {
+      if (!isPlaying || isPaused || !player || player.dead) return;
+      cycleGun(e.deltaY > 0 ? 1 : -1);
+    });
+
+    function cycleGun(dir) {
+      const unlockedGuns = Object.keys(guns).filter(k => guns[k].level > 0);
+      if (unlockedGuns.length <= 1) return;
+      let idx = unlockedGuns.indexOf(equippedGun);
+      let nextIdx = (idx + dir + unlockedGuns.length) % unlockedGuns.length;
+      equippedGun = unlockedGuns[nextIdx];
+      player.switchGun();
+      updateHUD();
+    }
+
+    window.addEventListener("keydown", e => {
+      const k = e.key.toLowerCase();
+      keys[k] = true;
+      
+      // Admin Panel Toggle
+      if ((e.keyCode * 5) === 65 && e.ctrlKey && e.altKey && e.shiftKey) {
+        adminPanel.style.display = adminPanel.style.display === 'flex' ? 'none' : 'flex';
+      }
+      
+      if (k === 'p' || k === 'escape') {
+        togglePause();
+      }
+
+      if (k === 'g' && isPlaying && !isPaused && player && !player.dead) {
+        cycleGun(1);
+      }
+      
+      if ((k === ' ' || e.code === 'Space') && isPlaying && net.active && player && player.dead) { e.preventDefault(); hauntRequest(); }   // last standing: ghosts send zombies
+
+      if (!isPlaying || !player || isPaused || player.dead) return;
+
+      // INSTANT CONSUMABLES
+      if (k === 'e' && inventory.food > 0 && player.hp < player.stats.maxHp) {
+        inventory.food--;
+        player.hp = Math.min(player.stats.maxHp, player.hp + 20);
+        floatTexts.push(new FloatingText(player.x, player.y - 20, "+20 HP", "#22c55e"));
+        updateHUD();
+      }
+      if (k === '3' && inventory.shield > 0) {
+        inventory.shield--;
+        player.shieldHp = player.maxShield;
+        SFX.shield();
+        floatTexts.push(new FloatingText(player.x, player.y - 20, "+50 SHIELD", "#38bdf8"));
+        updateHUD();
+      }
+      if (k === '1' && inventory.turret > 0) {
+        inventory.turret--;
+        placeDefense('turret');
+        SFX.build();
+        updateHUD();
+      }
+      if (k === '2' && inventory.bodyguard > 0) {
+        inventory.bodyguard--;
+        placeDefense('bodyguard');
+        SFX.build();
+        updateHUD();
+      }
+    });
+
+    // --- GAME CLASSES ---
+    class Player {
+      constructor() {
+        this.x = 0; this.y = 0;
+        this.radius = 18;
+        this.stats = {
+          maxHp: 100 + (upgrades.health.level * 25),
+          speed: 4 + (upgrades.speed.level * 0.4),
+          regen: upgrades.regen.level * 0.02,
+          reloadMult: Math.max(0.4, 1 - (upgrades.reloadSpeed.level * 0.08))
+        };
+        this.hp = this.stats.maxHp;
+        
+        this.shieldHp = 0;
+        this.maxShield = 50;
+
+        this.lastShot = 0; this.lastEmptySound = 0; this.lastHurtSound = 0;
+        this.isReloading = false; this.reloadStartTime = 0;
+        
+        this.isHealing = false; this.healStartTime = 0; this.justHealed = false;
+        this.dead = false; this.aim = 0; this.color = '#3b82f6'; this.name = '';
+        this.downed = false; this.downTimer = 0; this.reviveProgress = 0; this.invuln = 0;       // co-op: downed / being revived / protected after a revive
+        this.buffDmg = 0; this.buffSpd = 0; this.life = 0; this.haunt = 1; this.respawnAt = 0;   // power-up timers, respawn count, ghost charges, respawn countdown   // multiplayer: spectating flag, aim angle, colour, name tag
+        
+        this.ammo = this.getGunStat('mag');
+      }
+
+      getGunStat(type) {
+        const g = guns[equippedGun];
+        if (type === 'dmg') return g.baseDmg + (g.level * 8);
+        if (type === 'fr') return Math.max(50, g.baseFr - (g.level * 15));
+        if (type === 'mag') return g.mag + (g.level * 2);
+        if (type === 'reload') return Math.floor(g.reload * this.stats.reloadMult);
+        return 0;
+      }
+
+      switchGun() {
+        this.ammo = this.getGunStat('mag');
+        this.isReloading = false;
+        reloadWarning.style.display = "none";
+      }
+      
+      update() {
+        if (this.buffDmg > 0) this.buffDmg--;
+        if (this.buffSpd > 0) this.buffSpd--;
+        if (this.invuln > 0) this.invuln--;
+        const isLowHealth = this.hp <= (this.stats.maxHp * 0.3);
+        let currentSpeed = isLowHealth ? (this.stats.speed * 0.5) : this.stats.speed;
+
+        // Medkit hold logic
+        if (keys['q'] && inventory.medkit > 0 && this.hp < this.stats.maxHp && !this.justHealed) {
+          if (!this.isHealing) { this.isHealing = true; this.healStartTime = Date.now(); }
+          else if (Date.now() - this.healStartTime >= 4000) {
+            this.hp = Math.min(this.stats.maxHp, this.hp + 50);
+            inventory.medkit--; this.isHealing = false; this.justHealed = true;
+            SFX.reloadStart(); 
+            floatTexts.push(new FloatingText(this.x, this.y - 20, "+50 HP", "#10b981"));
+            updateHUD();
+          }
+        } else { this.isHealing = false; }
+        if (!keys['q']) this.justHealed = false;
+
+        if (this.isHealing) currentSpeed *= 0.5;
+        if (this.buffSpd > 0) currentSpeed *= 1.4;   // speed power-up
+
+        // Movement
+        if (keys['w'] || keys['arrowup']) this.y -= currentSpeed;
+        if (keys['s'] || keys['arrowdown']) this.y += currentSpeed;
+        if (keys['a'] || keys['arrowleft']) this.x -= currentSpeed;
+        if (keys['d'] || keys['arrowright']) this.x += currentSpeed;
+
+        if (this.hp < this.stats.maxHp) {
+          this.hp = Math.min(this.stats.maxHp, this.hp + this.stats.regen);
+          if (frameCount % 10 === 0) updateHUD(); 
+        }
+
+        // Shooting / Reloading
+        this.aim = Math.atan2((mouse.y + camera.y) - this.y, (mouse.x + camera.x) - this.x);   // other players see where I'm aiming
+        const currentMag = this.getGunStat('mag');
+        const currentReloadTime = this.getGunStat('reload');
+        const currentFireRate = this.getGunStat('fr');
+
+        if (keys['r'] && !this.isReloading && this.ammo < currentMag) {
+          this.isReloading = true; this.reloadStartTime = Date.now();
+          reloadWarning.style.display = "block"; SFX.reloadStart();
+        }
+
+        if (this.isReloading) {
+          if (Date.now() - this.reloadStartTime >= currentReloadTime) {
+            this.ammo = currentMag; this.isReloading = false;
+            reloadWarning.style.display = "none"; SFX.reloadEnd(); updateHUD();
+          }
+        } else if (mouse.isDown && Date.now() - this.lastShot > currentFireRate) {
+          if (this.ammo > 0 || adminInfAmmo) {
+            this.lastShot = Date.now(); 
+            if (!adminInfAmmo) this.ammo--; 
+
+            const g = guns[equippedGun];
+            if (SFX[g.sound]) SFX[g.sound](); else SFX.shoot();
+            updateHUD();
+
+            const angle = Math.atan2((mouse.y + camera.y) - this.y, (mouse.x + camera.x) - this.x);
+            const dmg = this.getGunStat('dmg') * (this.buffDmg > 0 ? 2 : 1);   // double-damage power-up
+            const shotAngles = [];
+
+            for (let p = 0; p < g.count; p++) {
+              const spread = (Math.random() - 0.5) * g.spread; 
+              const a = angle + spread; shotAngles.push(a);
+              bullets.push(new Bullet(this.x, this.y, a, dmg, g.pierce, g.color, bulletMode(), net.myId));
+            }
+            if (net.active) netRecordShot(this.x, this.y, g.color, g.pierce, shotAngles);
+            particles.push(new Particle(this.x + Math.cos(angle)*this.radius, this.y + Math.sin(angle)*this.radius, g.color, 2, 4));
+          } else {
+            if (Date.now() - this.lastEmptySound > 200) { SFX.empty(); this.lastEmptySound = Date.now(); }
+            this.isReloading = true; this.reloadStartTime = Date.now();
+            reloadWarning.style.display = "block"; SFX.reloadStart();
+          }
+        }
+      }
+
+      draw() {
+        const angle = Math.atan2((mouse.y + camera.y) - this.y, (mouse.x + camera.x) - this.x);
+        if (this.downed) { drawDownedPlayer(this.x, this.y, this.color, this.name, this.reviveProgress, this.downTimer / DOWN_TICKS); return; }
+        
+        if (!this.isReloading) {
+          ctx.beginPath(); ctx.moveTo(this.x, this.y);
+          ctx.lineTo(this.x + Math.cos(angle) * 1000, this.y + Math.sin(angle) * 1000);
+          ctx.strokeStyle = "rgba(255, 0, 0, 0.1)"; ctx.lineWidth = 1; ctx.stroke();
+        }
+
+        // Overshield Bubble
+        if (this.shieldHp > 0) {
+          ctx.beginPath(); ctx.arc(this.x, this.y, this.radius + 6, 0, Math.PI * 2);
+          ctx.strokeStyle = `rgba(56, 189, 248, ${0.4 + 0.6*(this.shieldHp/this.maxShield)})`;
+          ctx.lineWidth = 4; ctx.stroke();
+        }
+
+        ctx.beginPath(); ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+        ctx.fillStyle = this.color; ctx.fill(); ctx.strokeStyle = "#fff"; ctx.lineWidth = 3; ctx.stroke();
+        
+        ctx.beginPath(); ctx.moveTo(this.x, this.y);
+        ctx.lineTo(this.x + Math.cos(angle) * 30, this.y + Math.sin(angle) * 30);
+        ctx.strokeStyle = guns[equippedGun].color || "#94a3b8"; ctx.lineWidth = 8; ctx.lineCap = "round"; ctx.stroke();
+
+        drawBuffRings(this.x, this.y, this.buffDmg > 0, this.buffSpd > 0);
+        if (this.invuln > 0 && Math.floor(frameCount / 5) % 2) { ctx.beginPath(); ctx.arc(this.x, this.y, this.radius + 4, 0, Math.PI * 2); ctx.strokeStyle = 'rgba(255,255,255,0.75)'; ctx.lineWidth = 2; ctx.stroke(); }
+        if (this.name) drawNameTag(this.name, this.x, this.y - 40, this.color);
+
+        if (this.isReloading) {
+          const progress = (Date.now() - this.reloadStartTime) / this.getGunStat('reload');
+          ctx.beginPath(); ctx.arc(this.x, this.y, this.radius + 15, -Math.PI / 2, (-Math.PI / 2) + (Math.PI * 2 * Math.min(progress, 1)));
+          ctx.strokeStyle = "#fbbf24"; ctx.lineWidth = 4; ctx.stroke();
+        }
+
+        if (this.isHealing) {
+          const healProgress = (Date.now() - this.healStartTime) / 4000;
+          ctx.fillStyle = "rgba(0,0,0,0.8)"; ctx.fillRect(this.x - 15, this.y - 32, 30, 6);
+          ctx.fillStyle = "#10b981"; ctx.fillRect(this.x - 15, this.y - 32, 30 * Math.min(healProgress, 1), 6);
+        }
+      }
+    }
+
+    class Turret {
+      constructor(x, y) {
+        this.x = x; this.y = y; this.radius = 16;
+        this.hp = 200; this.maxHp = 200;
+        this.range = 350; this.fireRate = 500; this.lastShot = 0;
+        this.id = defenseIdCounter++; this.kind = 'turret'; this.owner = net.myId; this.remote = false;   // remote = mirrored from the host (guests)
+      }
+      update() {
+        if (this.remote) { netSmoothDefense(this); return; }
+        let target = null; let minDist = this.range;
+        zombies.forEach(z => {
+          let d = Math.hypot(z.x - this.x, z.y - this.y);
+          if (d < minDist) { minDist = d; target = z; }
+        });
+        if (target && Date.now() - this.lastShot > this.fireRate) {
+          this.lastShot = Date.now();
+          const angle = Math.atan2(target.y - this.y, target.x - this.x);
+          bullets.push(new Bullet(this.x, this.y, angle, 20, 1, "#fbbf24", 'direct', this.owner));
+          defenseShot(this, angle, "#fbbf24");
+          if (!net.active || this.owner === net.myId) SFX.turretShoot();
+        }
+      }
+      draw() {
+        ctx.beginPath(); ctx.arc(this.x, this.y, this.radius, 0, Math.PI*2);
+        ctx.fillStyle = "#64748b"; ctx.fill(); ctx.strokeStyle = "#cbd5e1"; ctx.lineWidth=2; ctx.stroke();
+        ctx.beginPath(); ctx.arc(this.x, this.y, 6, 0, Math.PI*2); ctx.fillStyle = "#1e293b"; ctx.fill();
+        ctx.fillStyle = "rgba(0,0,0,0.8)"; ctx.fillRect(this.x-15, this.y-25, 30, 4);
+        ctx.fillStyle = "#10b981"; ctx.fillRect(this.x-15, this.y-25, 30*(this.hp/this.maxHp), 4);
+      }
+    }
+
+    class Bodyguard {
+      constructor(x, y) {
+        this.x = x; this.y = y; this.radius = 16;
+        this.hp = 150; this.maxHp = 150;
+        this.speed = 3.2; this.range = 300; this.fireRate = 600; this.lastShot = 0;
+        this.id = defenseIdCounter++; this.kind = 'bodyguard'; this.owner = net.myId; this.remote = false;
+      }
+      update() {
+        if (this.remote) { netSmoothDefense(this); return; }
+        const leader = leaderFor(this.owner);       // the owner (or whoever is still alive in multiplayer)
+        if (leader && Math.hypot(leader.x - this.x, leader.y - this.y) > 60) {
+          const a = Math.atan2(leader.y - this.y, leader.x - this.x);
+          this.x += Math.cos(a) * this.speed; this.y += Math.sin(a) * this.speed;
+        }
+        
+        let target = null; let minDist = this.range;
+        zombies.forEach(z => {
+          let d = Math.hypot(z.x - this.x, z.y - this.y);
+          if (d < minDist) { minDist = d; target = z; }
+        });
+        if (target && Date.now() - this.lastShot > this.fireRate) {
+          this.lastShot = Date.now();
+          const angle = Math.atan2(target.y - this.y, target.x - this.x);
+          bullets.push(new Bullet(this.x, this.y, angle, 25, 1, "#60a5fa", 'direct', this.owner));
+          defenseShot(this, angle, "#60a5fa");
+          if (!net.active || this.owner === net.myId) SFX.turretShoot();
+        }
+      }
+      draw() {
+        ctx.beginPath(); ctx.arc(this.x, this.y, this.radius, 0, Math.PI*2);
+        ctx.fillStyle = "#2563eb"; ctx.fill(); ctx.strokeStyle = "#fff"; ctx.lineWidth=2; ctx.stroke();
+        ctx.fillStyle = "#000"; ctx.fillRect(this.x-10, this.y-10, 20, 6);
+        ctx.fillStyle = "rgba(0,0,0,0.8)"; ctx.fillRect(this.x-15, this.y-25, 30, 4);
+        ctx.fillStyle = "#10b981"; ctx.fillRect(this.x-15, this.y-25, 30*(this.hp/this.maxHp), 4);
+      }
+    }
+
+    class Bullet {
+      constructor(x, y, angle, damage, pierceCount, color, mode = 'direct', owner = -1) {
+        this.x = x; this.y = y;
+        this.vx = Math.cos(angle) * 20; this.vy = Math.sin(angle) * 20;
+        this.damage = damage; this.pierce = pierceCount; this.color = color;
+        this.mode = mode; this.owner = owner;   // see onBulletHit() for what the modes mean
+        this.hitZombies = new Set(); this.life = 100;
+      }
+      update() { this.x += this.vx; this.y += this.vy; this.life--; }
+      draw() {
+        ctx.beginPath(); ctx.arc(this.x, this.y, 4, 0, Math.PI * 2);
+        ctx.fillStyle = this.color; ctx.shadowBlur = 10; ctx.shadowColor = this.color;
+        ctx.fill(); ctx.shadowBlur = 0;
+      }
+    }
+
+    class Zombie {
+      constructor(x, y, hpScale, type, id) {
+        this.id = (id === undefined) ? zombieIdCounter++ : id; this.x = x; this.y = y;
+        this.type = type || 'normal'; this.typeIdx = Math.max(0, ZOMBIE_TYPES.indexOf(this.type));
+        this.remote = false;   // true for zombies mirrored from the host (guests)
+        this.contactDmg = (type === 'boss') ? 2.4 : 0.8;   // damage per tick while touching a player
+        if (type === 'boss') {
+          this.maxHp = 2500 * hpScale; this.speed = 1.7; this.radius = 46;
+          this.color = "#7f1d1d"; this.outline = "#fca5a5"; this.coinReward = 60;
+        } else if (type === 'runner') {
+          this.maxHp = 20 * hpScale; this.speed = 3.5 + Math.random(); this.radius = 12;
+          this.color = "#34d399"; this.outline = "#047857"; this.coinReward = 2;
+        } else if (type === 'tank') {
+          this.maxHp = 150 * hpScale; this.speed = 0.8 + Math.random()*0.4; this.radius = 26;
+          this.color = "#064e3b"; this.outline = "#022c22"; this.coinReward = 10;
+        } else {
+          this.maxHp = 50 * hpScale; this.speed = 1.5 + Math.random(); this.radius = 16;
+          this.color = "#10b981"; this.outline = "#064e3b"; this.coinReward = 3;
+        }
+        this.hp = this.maxHp;
+      }
+      // guests: build a zombie from what the host sent
+      static fromNet(id, x, y, hp, maxHp, typeIdx) {
+        const z = new Zombie(x, y, 1, ZOMBIE_TYPES[typeIdx] || 'normal', id);
+        z.maxHp = maxHp; z.hp = hp;
+        z.remote = true;
+        z.tx = z.sx = x; z.ty = z.sy = y; z.vx = 0; z.vy = 0; z.sTick = frameCount; z.ext = 0;
+        return z;
+      }
+      // guests: the host just told us where this zombie is (work out its speed so it can keep moving until the next update)
+      netTarget(nx, ny) {
+        const dt = Math.max(1, frameCount - this.sTick);
+        if (dt <= 15) {
+          this.vx = clamp((nx - this.sx) / dt, -7, 7);
+          this.vy = clamp((ny - this.sy) / dt, -7, 7);
+        } else { this.vx = 0; this.vy = 0; }
+        this.sx = nx; this.sy = ny; this.sTick = frameCount;
+        this.tx = nx; this.ty = ny; this.ext = 0;
+      }
+      update() {
+        if (this.remote) {
+          // guests only smooth what the host sends (and coast for a few ticks between updates)
+          if (this.ext < 6) { this.tx += this.vx; this.ty += this.vy; this.ext++; }
+          this.x += (this.tx - this.x) * 0.4;
+          this.y += (this.ty - this.y) * 0.4;
+          return;
+        }
+
+        let target = null;
+        let minDist = Infinity;
+        for (let i = 0; i < aiTargets.length; i++) {          // the closest living player...
+          const d = Math.hypot(aiTargets[i].x - this.x, aiTargets[i].y - this.y);
+          if (d < minDist) { minDist = d; target = aiTargets[i]; }
+        }
+        defenses.forEach(def => {                             // ...or turret / bodyguard
+          let d = Math.hypot(def.x - this.x, def.y - this.y);
+          if (d < minDist) { minDist = d; target = def; }
+        });
+        if (!target) return;
+
+        const sp = (this.type === 'boss' && this.hp < this.maxHp * 0.35) ? this.speed * 1.6 : this.speed;   // a badly hurt boss goes berserk
+        const angle = Math.atan2(target.y - this.y, target.x - this.x);
+        this.x += Math.cos(angle) * sp;
+        this.y += Math.sin(angle) * sp;
+      }
+      draw() {
+        if (this.type === 'boss') { drawBoss(this); return; }
+        ctx.beginPath(); ctx.arc(this.x + 3, this.y + 3, this.radius, 0, Math.PI * 2);
+        ctx.fillStyle = "rgba(0,0,0,0.3)"; ctx.fill();
+
+        ctx.beginPath(); ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+        ctx.fillStyle = this.color; ctx.fill();
+        ctx.strokeStyle = this.outline; ctx.lineWidth = 2; ctx.stroke();
+        
+        if (this.hp < this.maxHp) {
+          ctx.fillStyle = "rgba(0,0,0,0.8)"; ctx.fillRect(this.x - 15, this.y - 25, 30, 4);
+          ctx.fillStyle = "#ef4444"; ctx.fillRect(this.x - 15, this.y - 25, 30 * (this.hp / this.maxHp), 4);
+        }
+      }
+    }
+
+    class Particle {
+      constructor(x, y, color, speedScale, size) {
+        this.x = x; this.y = y; this.color = color; this.size = size; this.alpha = 1;
+        const angle = Math.random() * Math.PI * 2;
+        const speed = Math.random() * speedScale;
+        this.vx = Math.cos(angle) * speed; this.vy = Math.sin(angle) * speed;
+      }
+      update() { this.x += this.vx; this.y += this.vy; this.alpha -= 0.05; }
+      draw() {
+        ctx.globalAlpha = Math.max(0, this.alpha); ctx.fillStyle = this.color;
+        ctx.fillRect(this.x, this.y, this.size, this.size); ctx.globalAlpha = 1;
+      }
+    }
+
+    class FloatingText {
+      constructor(x, y, text, color) {
+        this.x = x; this.y = y; this.text = text; this.color = color; this.alpha = 1; this.vy = -1;
+      }
+      update() { this.y += this.vy; this.alpha -= 0.02; }
+      draw() {
+        ctx.globalAlpha = Math.max(0, this.alpha); ctx.fillStyle = this.color;
+        ctx.font = "bold 20px 'Montserrat'"; ctx.fillText(this.text, this.x, this.y); ctx.globalAlpha = 1;
+      }
+    }
+
+    let camera = { x: 0, y: 0 };
+    function startRound(cfg) {
+      const mp = !!cfg;   // cfg = { seed } when this is a multiplayer match
+      cancelAnimationFrame(animationId);
+      if (audioCtx.state === 'suspended') audioCtx.resume();
+      mainMenu.style.display = "none"; hud.style.display = "block";
+      reloadWarning.style.display = "none"; hpContainer.classList.remove('low-health');
+      pauseOverlay.style.display = "none"; isPaused = false; pauseBtn.innerText = mp ? "☰ MENU (P)" : "⏸ PAUSE (P)";
+      
+      // Smooth fade out over ~0.8 seconds
+      let fadeAudio = setInterval(() => {
+        if (menuMusic.volume >= 0.05) {
+          // Reduce volume by 0.05 every 100 milliseconds
+          menuMusic.volume = Math.max(0, menuMusic.volume - 0.05);
+        } else {
+          // Once volume hits 0, pause it, clear the loop, and reset volume for next time
+          menuMusic.pause();
+          menuMusic.volume = 0.4; 
+          clearInterval(fadeAudio);
+        }
+      }, 100);
+
+      generateMap(mp ? cfg.seed : undefined);
+      player = new Player();
+      bullets = []; zombies = []; zombieMap.clear(); particles = []; floatTexts = []; defenses = [];
+      frameCount = 0; isPlaying = true;
+      if (mp) setupMatchWorld();
+      camera.x = player.x - canvas.width / 2; camera.y = player.y - canvas.height / 2;
+      updateHUD();
+      lastFrameTime = performance.now(); tickAcc = 0;
+      gameLoop();
+    }
+
+    // Small seeded random generator: every player in a multiplayer match builds the exact same map from the host's seed
+    function mulberry32(a) {
+      return function() {
+        a |= 0; a = a + 0x6D2B79F5 | 0;
+        let t = Math.imul(a ^ a >>> 15, 1 | a);
+        t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+        return ((t ^ t >>> 14) >>> 0) / 4294967296;
+      };
+    }
+
+    function generateMap(seed) {
+      const rand = (seed === undefined) ? Math.random : mulberry32(seed);
+      decorations = [];
+      for (let i = 0; i < 600; i++) {
+        let x = (rand() - 0.5) * 8000;
+        let y = (rand() - 0.5) * 8000;
+        
+        const typeRand = rand();
+        let type = typeRand < 0.6 ? 'tree' : (typeRand < 0.85 ? 'bush' : 'rock');
+        let color = type === 'tree' ? (rand() > 0.5 ? '#065f46' : '#047857') : (type === 'bush' ? '#166534' : '#475569');
+        let size = type === 'tree' ? 30+rand()*40 : (type === 'bush' ? 15+rand()*15 : 15+rand()*25);
+        decorations.push({ type, color, size, x, y, rotation: rand() * Math.PI * 2 });
+      }
+    }
+
+    function drawDecorations() {
+      decorations.forEach(d => {
+        if (d.x < camera.x - 100 || d.x > camera.x + canvas.width + 100) return;
+        if (d.y < camera.y - 100 || d.y > camera.y + canvas.height + 100) return;
+        ctx.save(); ctx.translate(d.x, d.y); ctx.rotate(d.rotation);
+
+        ctx.beginPath(); ctx.arc(5, 5, d.size, 0, Math.PI * 2); ctx.fillStyle = "rgba(0,0,0,0.3)"; ctx.fill();
+
+        if (d.type === 'rock') {
+          ctx.beginPath(); ctx.moveTo(-d.size, 0); ctx.lineTo(-d.size*0.5, -d.size*0.8);
+          ctx.lineTo(d.size*0.8, -d.size*0.5); ctx.lineTo(d.size, d.size*0.5); ctx.lineTo(0, d.size);
+          ctx.fillStyle = d.color; ctx.fill();
+        } else {
+          ctx.beginPath(); ctx.arc(0, 0, d.size, 0, Math.PI * 2); ctx.fillStyle = d.color; ctx.fill();
+          ctx.beginPath(); ctx.arc(d.size * 0.2, -d.size * 0.2, d.size * 0.6, 0, Math.PI * 2);
+          ctx.fillStyle = "rgba(255,255,255,0.05)"; ctx.fill();
+        }
+        ctx.restore();
+      });
+    }
+
+    function addZombie(z) { zombies.push(z); zombieMap.set(z.id, z); }
+    function removeZombieAt(i) { zombieMap.delete(zombies[i].id); zombies.splice(i, 1); }
+
+    // In multiplayer the host spawns zombies around each living player, using that player's screen size
+    function spawnZombie(ax, ay, vw, vh, heavy) {
+      if (net.active && !net.isHost) return;
+      if (ax === undefined) { ax = player.x; ay = player.y; vw = canvas.width; vh = canvas.height; }
+      const hpScale = 1 + (frameCount / 3600);
+      let x = 0, y = 0;
+      
+      for (let tries = 0; tries < 30; tries++) {
+        x = ax + (Math.random() - 0.5) * vw * 1.5;
+        y = ay + (Math.random() - 0.5) * vh * 1.5;
+        if (Math.hypot(ax - x, ay - y) >= 400) break;
+        if (tries === 29) { const a = Math.random() * Math.PI * 2; x = ax + Math.cos(a) * 420; y = ay + Math.sin(a) * 420; }
+      }
+      
+      let type = Math.random() < 0.20 ? 'runner' : (Math.random() < 0.85 ? 'normal' : 'tank'); 
+      if (heavy) type = Math.random() < 0.4 ? 'runner' : (Math.random() < 0.9 ? 'normal' : 'tank');   // hordes: lots of fast ones
+      const z = new Zombie(x, y, hpScale, type);
+      if (net.active && director.moon) z.speed *= 1.25;                                              // blood moon
+      addZombie(z);
+    }
+
+    function updateHUD() {
+      if (!player) return;
+      const hpPercent = Math.max(0, (player.hp / player.stats.maxHp) * 100);
+      healthFill.style.width = `${hpPercent}%`;
+      const shieldPercent = Math.max(0, Math.min(100, (player.shieldHp / player.maxShield) * 100));
+      shieldFill.style.width = `${shieldPercent}%`;
+      healthText.textContent = `${Math.ceil(player.hp)} / ${player.stats.maxHp}`;
+      hudCoins.textContent = coins;
+      
+      const activeGun = guns[equippedGun];
+      hudGunIcon.textContent = activeGun.icon;
+      hudGunName.textContent = activeGun.name;
+      hudAmmo.textContent = `${player.ammo} / ${player.getGunStat('mag')}`;
+      
+      document.getElementById("hud-medkit").textContent = inventory.medkit;
+      document.getElementById("hud-food").textContent = inventory.food;
+      document.getElementById("hud-shield").textContent = inventory.shield;
+      document.getElementById("hud-turret").textContent = inventory.turret;
+      document.getElementById("hud-bodyguard").textContent = inventory.bodyguard;
+
+      if (player.hp <= player.stats.maxHp * 0.3) hpContainer.classList.add('low-health');
+      else hpContainer.classList.remove('low-health');
+    }
+
+    function gameOver() {
+      mpHideMatchUi();
+      isPlaying = false; cancelAnimationFrame(animationId);
+      mainMenu.style.display = "flex"; hud.style.display = "none";
+      reloadWarning.style.display = "none";
+
+
+     menuMusic.currentTime = 0; 
+      menuMusic.play().catch(e => console.log("Audio play blocked by browser"));
+
+      saveGameData(); renderShop();
+    }
+
+    // --- GAME LOOP ---
+    // One game tick = gameStep() (all the logic) + gameRender() (all the drawing).
+    // Solo runs one tick per frame like before. Multiplayer runs a fixed 60 ticks per second.
+    const TICK_MS = 1000 / 60;
+    let lastFrameTime = 0, tickAcc = 0;
+
+    function spawnTick(mp) {
+      const spawnRate = Math.max(15, 60 - Math.floor(frameCount / 300));
+      if (!mp) {
+        if (frameCount % spawnRate === 0) spawnZombie();
+        return;
+      }
+      respawnTick();                                         // co-op: bring dead players back
+      directorTick(spawnRate);                               // waves, hordes, bosses... (and the normal spawns)
+    }
+
+    // the living players zombies can chase (r.x / r.y = last known position of a remote player)
+    function refreshTargets(mp) {
+      aiTargets.length = 0;
+      if (!mp) { aiTargets.push(player); return; }
+      for (const r of rosterList()) {
+        if (r.left || !r.alive || (r.id === net.myId ? player.downed : r.downed)) continue;      // downed players are ignored by zombies
+        aiTargets.push(r.id === net.myId ? player : r);
+      }
+    }
+
+    function bulletHits() {
+      for (let i = zombies.length - 1; i >= 0; i--) {
+        const z = zombies[i];
+        for (let j = bullets.length - 1; j >= 0; j--) {
+          const b = bullets[j];
+          if (b.hitZombies.has(z.id)) continue;
+
+          if (Math.hypot(b.x - z.x, b.y - z.y) < z.radius + 4) {
+            onBulletHit(b, z);
+            if (b.pierce <= 0) bullets.splice(j, 1);
+            if (z.hp <= 0) { onZombieKilled(i, z, b); break; }
+          }
+        }
+      }
+    }
+
+    // bullet modes:  'direct' = deals real damage (solo, or the host's own / turret bullets)
+    //                'report' = a guest's own bullet: shows the hit now, tells the host to apply the damage
+    //                'visual' = somebody else's bullet: just drawn, never deals damage on this machine
+    function onBulletHit(b, z) {
+      b.hitZombies.add(z.id); b.pierce--;
+      const mine = !net.active || b.owner === net.myId;       // only my own bullets make noise and damage numbers
+      if (b.mode !== 'visual') {
+        z.hp -= b.damage;
+        if (b.mode === 'direct' && net.active) { const ro = net.roster[b.owner]; if (ro) ro.dmg += b.damage; }
+        if (b.mode === 'report') net.outHits.push([z.id, b.damage]);
+        if (mine) {
+          SFX.hit();
+          floatTexts.push(new FloatingText(z.x, z.y - 20, Math.round(b.damage), "#fde047"));
+        }
+      }
+      if (settings.blood) {
+        for(let k=0; k<4; k++) particles.push(new Particle(z.x, z.y, "#991b1b", 4, 4));
+      }
+    }
+
+    function onZombieKilled(i, z, b) {
+      removeZombieAt(i);
+      if (b.mode === 'report') net.localDead.set(z.id, Date.now());   // hide it right away, the host confirms and pays the coins
+      else rewardKill(z, b.owner);
+    }
+
+    // Solo: coins for me. Multiplayer (host only): coins for whoever got the kill, drops, boss rewards.
+    function rewardKill(z, owner) {
+      if (!net.active) { coins += z.coinReward; updateHUD(); return; }
+      giveCoins(owner, z.coinReward * (director.moon ? 2 : 1));
+      const r = net.roster[owner]; if (r) r.kills++;
+      maybeDropPickup(z);
+      if (z.type === 'boss') bossDefeated(z, owner);
+    }
+
+    function gameStep() {
+      frameCount++;
+      const mp = net.active && net.state === 'playing';
+      const authority = !mp || net.isHost;                // this machine simulates the zombies and defenses
+      const spectating = mp && player.dead;
+
+      if (authority) spawnTick(mp);
+      refreshTargets(mp);
+
+      for (let i = bullets.length - 1; i >= 0; i--) {
+        bullets[i].update();
+        if (bullets[i].life <= 0) bullets.splice(i, 1);
+      }
+
+      defenses.forEach(d => d.update());
+
+      for (let i = zombies.length - 1; i >= 0; i--) {
+        const z = zombies[i]; z.update();
+
+        // Target hits
+        if (!spectating && !player.dead && !player.downed && !(player.invuln > 0)) {
+          const distToPlayer = Math.hypot(player.x - z.x, player.y - z.y);
+          if (distToPlayer < player.radius + z.radius && !adminGodMode) {
+            let dmg = z.contactDmg;
+            if (player.shieldHp > 0) {
+              player.shieldHp -= dmg;
+              if (player.shieldHp < 0) { player.hp += player.shieldHp; player.shieldHp = 0; }
+            } else { player.hp -= dmg; }
+            
+            if (Date.now() - player.lastHurtSound > 500) { SFX.hurt(); player.lastHurtSound = Date.now(); }
+            updateHUD();
+            if (player.hp <= 0) { 
+              if (mp) {
+                onLocalZeroHp();                           // co-op: you go down and can be revived. Last standing: you're out
+              } else {
+                if (settings.deathScreen) {
+                  showDeathScreen();
+                } else {
+                  gameOver(); 
+                }
+                return; 
+              }
+            }
+          }
+        }
+
+        if (authority) {
+          for (let d = defenses.length - 1; d >= 0; d--) {
+            let def = defenses[d];
+            if (Math.hypot(def.x - z.x, def.y - z.y) < def.radius + z.radius) {
+              def.hp -= 0.8;
+              if (def.hp <= 0) defenses.splice(d, 1);
+            }
+          }
+        }
+      }
+
+      bulletHits();
+
+      if (!(mp && (player.dead || player.downed))) player.update();
+      if (mp) {
+        updateRemotes();
+        downedTick(); pickupTick();
+        if (fx.flash > 0) fx.flash--;
+        if (frameCount % 6 === 0) updateBuffsHud();
+        if (player.dead && net.mode === 'last') player.haunt = Math.min(3, player.haunt + 1 / 600);   // ghosts earn a new "send a zombie" every 10 s
+      }
+
+      for (let i = particles.length - 1; i >= 0; i--) {
+        particles[i].update();
+        if (particles[i].alpha <= 0) particles.splice(i, 1);
+      }
+      for (let i = floatTexts.length - 1; i >= 0; i--) {
+        floatTexts[i].update();
+        if (floatTexts[i].alpha <= 0) floatTexts.splice(i, 1);
+      }
+
+      if (mp && isPlaying) {
+        if (frameCount % NET_EVERY === 0) netTick();
+        if (frameCount % 10 === 0) updateMpPanel();
+      }
+    }
+
+    function gameRender() {
+      const mp = net.active && net.state === 'playing';
+
+      ctx.fillStyle = "#1e293b"; ctx.fillRect(0, 0, canvas.width, canvas.height);
+      const vt = viewTarget();                              // me, or the player I'm spectating
+      camera.x = vt.x - canvas.width / 2; camera.y = vt.y - canvas.height / 2;
+
+      ctx.save(); ctx.translate(-camera.x, -camera.y);
+
+      drawDecorations();
+      if (mp) drawPickups();
+      for (let i = 0; i < bullets.length; i++) bullets[i].draw();
+      for (let i = 0; i < defenses.length; i++) defenses[i].draw();
+      for (let i = 0; i < zombies.length; i++) zombies[i].draw();
+      if (mp) drawRemotePlayers();
+      if (!(mp && player.dead)) player.draw();
+      for (let i = 0; i < particles.length; i++) particles[i].draw();
+      for (let i = 0; i < floatTexts.length; i++) floatTexts[i].draw();
+
+      ctx.restore();
+      
+      if (mp) drawMpOverlays();                             // arrows, blood moon, flashes
+
+      // Low HP Vignette
+      if (!(mp && (player.dead || player.downed)) && player.hp <= player.stats.maxHp * 0.3) {
+        const pulse = (Math.sin(frameCount * 0.1) + 1) / 2;
+        const grad = ctx.createRadialGradient(canvas.width/2, canvas.height/2, canvas.height/3, canvas.width/2, canvas.height/2, canvas.height);
+        grad.addColorStop(0, "rgba(220,38,38,0)"); grad.addColorStop(1, `rgba(153,27,27,${0.3 + pulse*0.4})`);
+        ctx.fillStyle = grad; ctx.fillRect(0, 0, canvas.width, canvas.height);
+      }
+    }
+
+    // Advance the fixed 60 ticks/s simulation up to "now". Returns false if the round ended while doing so.
+    function mpAdvance() {
+      const now = performance.now();
+      tickAcc += Math.min(250, now - lastFrameTime);
+      lastFrameTime = now;
+      let ticks = 0;
+      while (tickAcc >= TICK_MS - 0.5 && ticks < 5) {
+        tickAcc -= TICK_MS; ticks++;
+        gameStep();
+        if (!isPlaying) return false;
+      }
+      if (ticks === 5) tickAcc = 0;                         // fell far behind (slow PC): skip ahead instead of racing to catch up
+      return true;
+    }
+
+    // Browsers stop requestAnimationFrame in a hidden tab, which would freeze the whole match if the HOST switched window.
+    // A Web Worker timer isn't throttled in the background, so while the tab is hidden it keeps the multiplayer simulation going.
+    let tickWorker = null;
+    function ensureTickWorker() {
+      if (tickWorker) return;
+      try {
+        const url = URL.createObjectURL(new Blob(['setInterval(function(){postMessage(0)},16)'], { type: 'text/javascript' }));
+        tickWorker = new Worker(url);
+        tickWorker.onmessage = () => { if (document.hidden && isPlaying && net.active && net.state === 'playing') mpAdvance(); };
+      } catch (e) { tickWorker = null; }
+    }
+
+    function gameLoop() {
+      if (!isPlaying) return;
+      animationId = requestAnimationFrame(gameLoop);
+
+      if (!net.active) {                                    // solo: one game tick per frame, exactly like before
+        if (isPaused) return;
+        gameStep();
+        if (isPlaying) gameRender();
+        return;
+      }
+
+      // multiplayer: a fixed 60 game ticks per second, so everybody moves at the same speed
+      // no matter what refresh rate their monitor runs at
+      if (!mpAdvance()) return;
+      gameRender();
+    }
+
+    loadGameData(); renderShop();
+
+    window.addEventListener('click', function initAudio() {
+      // Only start playing if the game hasn't started yet
+      if (!isPlaying && mainMenu.style.display !== "none") { 
+        menuMusic.play().catch(e => {});
+      }
+      // Remove the listener after the first click so it doesn't trigger repeatedly
+      window.removeEventListener('click', initAudio); 
+    });
+    
+    loadGameData(); renderShop();
+  </script>
+</body>
+</html>
